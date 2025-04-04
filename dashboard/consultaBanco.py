@@ -1,10 +1,14 @@
 import psycopg2
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 db_params = {
     "dbname": "star_comex_principal",
     "user": "postgres",
     "password": "postgres", 
-    "host": "ec2-13-218-45-115.compute-1.amazonaws.com",
+    "host": os.getenv("DB_HOST"),
     "port": "5445",
     "options": "-c client_encoding=UTF8"
 }

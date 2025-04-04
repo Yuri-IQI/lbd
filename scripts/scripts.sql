@@ -244,7 +244,7 @@ CREATE TABLE DM_Produtos (
 	descricao varchar(255),
 	codigo_ncm varchar(10),
 	ds_categoria varchar(255),
-	PRIMARY KEY (sk_produtoid)
+	PRIMARY KEY (sk_produto)
 );
 
 CREATE TABLE DM_Tempo (
