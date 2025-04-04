@@ -1,6 +1,6 @@
-CREATE DATABASE space_comex_principal;
+CREATE DATABASE star_comex_principal;
 
-\c space_comex_principal;
+\c star_comex_principal;
 
 -- public.blocos_economicos definição
 
@@ -234,9 +234,9 @@ INSERT INTO public.transacoes (tipo_id, pais_origem, pais_destino, produto_id, v
 (1, 4, 2, 4, 7100000.00, 3800, 1, 9),
 (2, 5, 3, 5, 9700000.00, 5500, 3, 9);
 
-CREATE DATABASE space_comex_data_mart;
+CREATE DATABASE star_comex_data_mart;
 
-\c space_comex_data_mart;
+\c star_comex_data_mart;
 
 CREATE TABLE DM_Produtos (
 	id_produto bigint NOT NULL,
@@ -287,7 +287,6 @@ CREATE TABLE DM_Cambios (
 CREATE TABLE DM_Transporte (
 	id_transporte bigint NOT NULL,
 	ds_transporte varchar NOT NULL,
-	tp_transporte varchar NOT NULL,
 	PRIMARY KEY (id_transporte)
 );
 
@@ -300,5 +299,6 @@ CREATE TABLE FT_Transacoes (
 	id_cambios bigint NOT NULL REFERENCES DM_Cambios (id_cambio),
 	valor_monetario double precision NOT NULL,
 	quantidade bigint NOT NULL,
+	tp_transacao varchar,
 	PRIMARY KEY (id_transporte, id_pais_origem, id_pais_destino, id_produto, id_tempo, id_cambios)
 );

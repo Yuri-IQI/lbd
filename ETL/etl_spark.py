@@ -19,34 +19,57 @@ db_properties = {
     "driver": "org.postgresql.Driver"
 }
 
+# Funções básicas para o ETL
+
+def extract_from_principal(query):
+    return spark.read \
+        .format("jdbc") \
+        .option("url", db_url + "/space_comex_principal") \
+        .option("query", query) \
+        .options(**db_properties) \
+        .load()
+
+def transform_text_to_uppercase(df, columns):
+    for column in columns:
+        df = df.withColumn(column, upper(col(column)))
+    return df
+
+def load_to_data_mart(df, table_name):
+    df.write \
+        .mode("append") \
+        .format("jdbc") \
+        .option("url", db_url + "/space_comex_data_mart") \
+        .option("dbtable", table_name) \
+        .option("user", db_properties["user"]) \
+        .option("password", db_properties["password"]) \
+        .option("driver", db_properties["driver"]) \
+        .save()
+
 # ETL de produtos
 
+products_query = "select p.id as id_produto, p.descricao, cp.descricao as ds_categoria, codigo_ncm from produtos p " \
+    "inner join categoria_produtos cp on cp.id = p.categoria_id"
+
 # Extração das tabelas de produtos e categoria_produtos
-products_extract = spark.read \
-    .format("jdbc") \
-    .option("url", db_url + "/space_comex_principal") \
-    .option("query", "select p.id as id_produto, p.descricao, cp.descricao as ds_categoria, codigo_ncm from produtos p " \
-    "inner join categoria_produtos cp on cp.id = p.categoria_id") \
-    .options(**db_properties) \
-    .load()
+products_extract = extract_from_principal(products_query)
 
 # Transformação dos campos de texto para uppercase
-products_transformed = products_extract \
-    .withColumn("descricao", upper(col("descricao"))) \
-    .withColumn("codigo_ncm", upper(col("codigo_ncm"))) \
-    .withColumn("ds_categoria", upper(col("ds_categoria")))
+products_transformed = transform_text_to_uppercase(products_extract, ["descricao", "codigo_ncm", "ds_categoria"])
 
 products_transformed.show()
 
 # Carregamento dos dados transformados em uma nova tabela
-products_transformed.write \
-    .mode("append") \
-    .format("jdbc") \
-    .option("url", db_url + "/space_comex_data_mart") \
-    .option("dbtable", "dm_produtos") \
-    .option("user", db_properties["user"]) \
-    .option("password", db_properties["password"]) \
-    .option("driver", db_properties["driver"]) \
-    .save()
+load_to_data_mart(products_transformed, "dm_produtos")
+
+# ETL de transportes
+
+transports_query = "select id as id_transporte, descricao as ds_transporte from transportes"
+transports_extract = extract_from_principal(transports_query)
+
+transports_transformed = transform_text_to_uppercase(transports_extract, ["ds_transporte"])
+
+transports_transformed.show()
+
+load_to_data_mart(transports_transformed, "dm_transportes")
 
 spark.stop()
