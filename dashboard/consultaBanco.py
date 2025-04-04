@@ -4,7 +4,7 @@ db_params = {
     "dbname": "star_comex_principal",
     "user": "postgres",
     "password": "postgres", 
-    "host": "jdbc:postgresql://ec2-13-218-45-115.compute-1.amazonaws.com:5445/postgres?ssl=false",
+    "host": "ec2-13-218-45-115.compute-1.amazonaws.com",
     "port": "5445",
     "options": "-c client_encoding=UTF8"
 }

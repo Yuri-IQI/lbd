@@ -239,66 +239,67 @@ CREATE DATABASE star_comex_data_mart;
 \c star_comex_data_mart;
 
 CREATE TABLE DM_Produtos (
-	id_produto bigint NOT NULL,
+	sk_produto int4 NOT NULL,
+	id_produto int4 NOT NULL,
 	descricao varchar(255),
 	codigo_ncm varchar(10),
 	ds_categoria varchar(255),
-	PRIMARY KEY (id_produto)
+	PRIMARY KEY (sk_produtoid)
 );
-
-
 
 CREATE TABLE DM_Tempo (
-	id_tempo bigint NOT NULL,
+	sk_tempo int4 NOT NULL,
 	data_completa date NOT NULL,
-	ano integer,
-	mes integer,
-	dia integer,
-	trimestre varchar(50),
-	semestre varchar(50),
-	PRIMARY KEY (id_tempo)
+	ano int4,
+	mes int4,
+	dia int4,
+	PRIMARY KEY (sk_tempo)
 );
-
-
 
 CREATE TABLE DM_Pais (
-	id_pais bigint NOT NULL,
-	pais varchar(255),
-	codigo_iso varchar(3),
-	nm_bloco varchar(255),
-	PRIMARY KEY (id_pais)
+	sk_pais int4 NOT NULL,
+	id_pais int4 NOT NULL,
+	pais varchar(100),
+	codigo_iso bpchar(3),
+	nm_bloco varchar(100),
+	PRIMARY KEY (sk_pais)
 );
-
-
 
 CREATE TABLE DM_Cambios (
-	id_cambio bigint NOT NULL,
+	sk_cambio int4 NOT NULL,
+	id_cambio int4 NOT NULL,
 	data date NOT NULL,
 	ds_moeda_origem varchar(255) NOT NULL,
-	pais_moeda_origem varchar(255) NOT NULL,
+	pais_moeda_origem varchar(10) NOT NULL,
 	ds_moeda_destino varchar(255) NOT NULL,
-	pais_moeda_destino varchar(255) NOT NULL,
-	taxa_cambio real NOT NULL,
-	PRIMARY KEY (id_cambio)
+	pais_moeda_destino varchar(10) NOT NULL,
+	taxa_cambio numeric(10,4) NOT NULL,
+	PRIMARY KEY (sk_cambio)
 );
 
-
-
 CREATE TABLE DM_Transporte (
-	id_transporte bigint NOT NULL,
-	ds_transporte varchar(255) NOT NULL,
-	PRIMARY KEY (id_transporte)
+	sk_transporte int4 NOT NULL,
+	id_transporte int4 NOT NULL,
+	ds_transporte varchar(50) NOT NULL,
+	PRIMARY KEY (sk_transporte)
 );
 
 CREATE TABLE FT_Transacoes (
-	id_transporte bigint NOT NULL REFERENCES DM_Transporte (id_transporte),
-	id_pais_origem bigint NOT NULL REFERENCES DM_Pais (id_pais),
-	id_pais_destino bigint NOT NULL REFERENCES DM_Pais (id_pais),
-	id_produto bigint NOT NULL REFERENCES DM_Produtos (id_produto),
-	id_tempo bigint NOT NULL REFERENCES DM_Tempo (id_tempo),
-	id_cambios bigint NOT NULL REFERENCES DM_Cambios (id_cambio),
-	valor_monetario double precision NOT NULL,
-	quantidade bigint NOT NULL,
-	tp_transacao varchar(50),
-	PRIMARY KEY (id_transporte, id_pais_origem, id_pais_destino, id_produto, id_tempo, id_cambios)
+	id_transporte int4 NOT NULL REFERENCES DM_Transporte (sk_transporte),
+	id_pais_origem int4 NOT NULL REFERENCES DM_Pais (sk_pais),
+	id_pais_destino int4 NOT NULL REFERENCES DM_Pais (sk_pais),
+	id_produto int4 NOT NULL REFERENCES DM_Produtos (sk_produto),
+	id_tempo int4 NOT NULL REFERENCES DM_Tempo (sk_tempo),
+	id_cambios int4 NOT NULL REFERENCES DM_Cambios (sk_cambio),
+	valor_monetario numeric(15,2) NOT NULL,
+	quantidade int4 NOT NULL,
+	tp_transacao varchar(10),
+	PRIMARY KEY (
+		id_transporte,
+		id_pais_origem,
+		id_pais_destino,
+		id_produto,
+		id_tempo,
+		id_cambios
+	)
 );
