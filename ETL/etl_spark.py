@@ -1,5 +1,9 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import upper, col
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 spark = SparkSession.builder \
     .appName("LBD") \
@@ -7,7 +11,7 @@ spark = SparkSession.builder \
     .config("spark.jars.packages", "org.postgresql:postgresql:42.2.16") \
     .getOrCreate()
 
-db_url = "jdbc:postgresql://localhost:5445"
+db_url = os.getenv("DB_URL")
 
 db_properties = {
     "user": "postgres",
