@@ -36,7 +36,7 @@ CREATE TABLE public.categoria_produtos (
 
 CREATE TABLE public.moedas (
 	id serial4 NOT NULL,
-	descricao varchar NOT NULL,
+	descricao varchar(255) NOT NULL,
 	pais varchar(10) NOT NULL,
 	CONSTRAINT moedas_pkey PRIMARY KEY (id)
 );
@@ -240,9 +240,9 @@ CREATE DATABASE star_comex_data_mart;
 
 CREATE TABLE DM_Produtos (
 	id_produto bigint NOT NULL,
-	descricao varchar,
-	codigo_ncm varchar,
-	ds_categoria varchar,
+	descricao varchar(255),
+	codigo_ncm varchar(10),
+	ds_categoria varchar(255),
 	PRIMARY KEY (id_produto)
 );
 
@@ -254,8 +254,8 @@ CREATE TABLE DM_Tempo (
 	ano integer,
 	mes integer,
 	dia integer,
-	trimestre varchar,
-	semestre varchar,
+	trimestre varchar(50),
+	semestre varchar(50),
 	PRIMARY KEY (id_tempo)
 );
 
@@ -263,9 +263,9 @@ CREATE TABLE DM_Tempo (
 
 CREATE TABLE DM_Pais (
 	id_pais bigint NOT NULL,
-	pais varchar,
-	codigo_iso varchar,
-	nm_bloco bigint,
+	pais varchar(255),
+	codigo_iso varchar(3),
+	nm_bloco varchar(255),
 	PRIMARY KEY (id_pais)
 );
 
@@ -274,10 +274,10 @@ CREATE TABLE DM_Pais (
 CREATE TABLE DM_Cambios (
 	id_cambio bigint NOT NULL,
 	data date NOT NULL,
-	ds_moeda_origem varchar NOT NULL,
-	pais_moeda_origem varchar NOT NULL,
-	ds_moeda_destino varchar NOT NULL,
-	pais_moeda_destino varchar NOT NULL,
+	ds_moeda_origem varchar(255) NOT NULL,
+	pais_moeda_origem varchar(255) NOT NULL,
+	ds_moeda_destino varchar(255) NOT NULL,
+	pais_moeda_destino varchar(255) NOT NULL,
 	taxa_cambio real NOT NULL,
 	PRIMARY KEY (id_cambio)
 );
@@ -286,7 +286,7 @@ CREATE TABLE DM_Cambios (
 
 CREATE TABLE DM_Transporte (
 	id_transporte bigint NOT NULL,
-	ds_transporte varchar NOT NULL,
+	ds_transporte varchar(255) NOT NULL,
 	PRIMARY KEY (id_transporte)
 );
 
@@ -299,6 +299,6 @@ CREATE TABLE FT_Transacoes (
 	id_cambios bigint NOT NULL REFERENCES DM_Cambios (id_cambio),
 	valor_monetario double precision NOT NULL,
 	quantidade bigint NOT NULL,
-	tp_transacao varchar,
+	tp_transacao varchar(50),
 	PRIMARY KEY (id_transporte, id_pais_origem, id_pais_destino, id_produto, id_tempo, id_cambios)
 );

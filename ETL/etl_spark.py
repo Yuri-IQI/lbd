@@ -24,7 +24,7 @@ db_properties = {
 def extract_from_principal(query):
     return spark.read \
         .format("jdbc") \
-        .option("url", db_url + "/space_comex_principal") \
+        .option("url", db_url + "/star_comex_principal") \
         .option("query", query) \
         .options(**db_properties) \
         .load()
@@ -38,7 +38,7 @@ def load_to_data_mart(df, table_name):
     df.write \
         .mode("append") \
         .format("jdbc") \
-        .option("url", db_url + "/space_comex_data_mart") \
+        .option("url", db_url + "/star_comex_data_mart") \
         .option("dbtable", table_name) \
         .option("user", db_properties["user"]) \
         .option("password", db_properties["password"]) \
@@ -70,6 +70,18 @@ transports_transformed = transform_text_to_uppercase(transports_extract, ["ds_tr
 
 transports_transformed.show()
 
-load_to_data_mart(transports_transformed, "dm_transportes")
+load_to_data_mart(transports_transformed, "dm_transporte")
+
+# ETL de países
+
+countries_query = "select p.id as id_pais, p.nome as pais, p.codigo_iso, b.nome as nm_bloco" \
+    "from paises p inner join blocos_economicos b on b.id = p.bloco_id"
+countries_extract = extract_from_principal(countries_query)
+
+countries_transformed = transform_text_to_uppercase(countries_extract, ["pais", "codigo_iso", "nm_bloco"])
+
+countries_transformed.show()
+
+load_to_data_mart(countries_transformed, "dm_paises")
 
 spark.stop()
