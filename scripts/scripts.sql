@@ -76,7 +76,7 @@ CREATE TABLE public.transportes (
 
 CREATE TABLE public.cambios (
 	id serial4 NOT NULL,
-	"data" date NOT NULL,
+	data date NOT NULL,
 	moeda_origem int4 NOT NULL,
 	moeda_destino int4 NOT NULL,
 	taxa_cambio numeric(10, 4) NOT NULL,
@@ -239,66 +239,66 @@ CREATE DATABASE space_comex_data_mart;
 \c space_comex_data_mart;
 
 CREATE TABLE DM_Produtos (
-    "id_produto" bigint NOT NULL,
-    "descricao" varchar,
-    "codigo_ncm" varchar,
-    "ds_categoria" varchar,
-    PRIMARY KEY ("id_produto")
+	id_produto bigint NOT NULL,
+	descricao varchar,
+	codigo_ncm varchar,
+	ds_categoria varchar,
+	PRIMARY KEY (id_produto)
 );
 
 
 
 CREATE TABLE DM_Tempo (
-    "id_tempo" bigint NOT NULL,
-    "data_completa" date NOT NULL,
-    "ano" integer,
-    "mes" integer,
-    "dia" integer,
-    "trimestre" varchar,
-    "semestre" varchar,
-    PRIMARY KEY ("id_tempo")
+	id_tempo bigint NOT NULL,
+	data_completa date NOT NULL,
+	ano integer,
+	mes integer,
+	dia integer,
+	trimestre varchar,
+	semestre varchar,
+	PRIMARY KEY (id_tempo)
 );
 
 
 
 CREATE TABLE DM_Pais (
-    "id_pais" bigint NOT NULL,
-    "pais" varchar,
-    "codigo_iso" varchar,
-    "nm_bloco" bigint,
-    PRIMARY KEY ("id_pais")
+	id_pais bigint NOT NULL,
+	pais varchar,
+	codigo_iso varchar,
+	nm_bloco bigint,
+	PRIMARY KEY (id_pais)
 );
 
 
 
 CREATE TABLE DM_Cambios (
-    "id_cambio" bigint NOT NULL,
-    "data" date NOT NULL,
-    "ds_moeda_origem" varchar NOT NULL,
-    "pais_moeda_origem" varchar NOT NULL,
-    "ds_moeda_destino" varchar NOT NULL,
-    "pais_moeda_destino" varchar NOT NULL,
-    "taxa_cambio" real NOT NULL,
-    PRIMARY KEY ("id_cambio")
+	id_cambio bigint NOT NULL,
+	data date NOT NULL,
+	ds_moeda_origem varchar NOT NULL,
+	pais_moeda_origem varchar NOT NULL,
+	ds_moeda_destino varchar NOT NULL,
+	pais_moeda_destino varchar NOT NULL,
+	taxa_cambio real NOT NULL,
+	PRIMARY KEY (id_cambio)
 );
 
 
 
 CREATE TABLE DM_Transporte (
-    "id_transporte" bigint NOT NULL,
-    "ds_transporte" varchar NOT NULL,
-    "tp_transporte" varchar NOT NULL,
-    PRIMARY KEY ("id_transporte")
+	id_transporte bigint NOT NULL,
+	ds_transporte varchar NOT NULL,
+	tp_transporte varchar NOT NULL,
+	PRIMARY KEY (id_transporte)
 );
 
 CREATE TABLE FT_Transacoes (
-    "id_transporte" bigint NOT NULL REFERENCES "DM_Transporte" ("id_transporte"),
-    "id_pais_origem" bigint NOT NULL REFERENCES "DM_Pais" ("id_pais"),
-    "id_pais_destino" bigint NOT NULL REFERENCES "DM_Pais" ("id_pais"),
-    "id_produto" bigint NOT NULL REFERENCES "DM_Produtos" ("id_produto"),
-    "id_tempo" bigint NOT NULL REFERENCES "DM_Tempo" ("id_tempo"),
-    "id_cambios" bigint NOT NULL REFERENCES "DM_Cambios" ("id_cambio"),
-    "valor_monetario" double precision NOT NULL,
-    "quantidade" bigint NOT NULL,
-    PRIMARY KEY ("id_transporte", "id_pais_origem", "id_pais_destino", "id_produto", "id_tempo", "id_cambios")
+	id_transporte bigint NOT NULL REFERENCES DM_Transporte (id_transporte),
+	id_pais_origem bigint NOT NULL REFERENCES DM_Pais (id_pais),
+	id_pais_destino bigint NOT NULL REFERENCES DM_Pais (id_pais),
+	id_produto bigint NOT NULL REFERENCES DM_Produtos (id_produto),
+	id_tempo bigint NOT NULL REFERENCES DM_Tempo (id_tempo),
+	id_cambios bigint NOT NULL REFERENCES DM_Cambios (id_cambio),
+	valor_monetario double precision NOT NULL,
+	quantidade bigint NOT NULL,
+	PRIMARY KEY (id_transporte, id_pais_origem, id_pais_destino, id_produto, id_tempo, id_cambios)
 );
