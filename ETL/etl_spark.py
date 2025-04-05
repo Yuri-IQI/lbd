@@ -9,26 +9,23 @@ from dotenv import load_dotenv
 import requests
 import os
 import pycountry
+from babel.numbers import get_territory_currencies
 
-# Load environment variables
 load_dotenv()
 db_url = os.getenv("DB_URL")
 
-# Spark session config
 spark = SparkSession.builder \
     .appName("LBD Dimensional ETL") \
     .master("local[*]") \
     .config("spark.jars.packages", "org.postgresql:postgresql:42.2.16") \
     .getOrCreate()
 
-# DB connection properties
 db_properties = {
     "user": "postgres",
     "password": "postgres",
     "driver": "org.postgresql.Driver"
 }
 
-# ========== Helper Functions ==========
 
 def extract_from_principal(query: str):
     return spark.read \
@@ -58,15 +55,22 @@ def add_surrogate_key(df, key_column: str, sk_name: str = None):
     window = Window.orderBy(key_column)
     return df.withColumn(sk_name, row_number().over(window))
 
-def get_currency_from_country_code(country_code):
-    country = pycountry.countries.get(alpha_3=country_code.upper())
-    if country:
-        currency = pycountry.currencies.get(numeric=country.numeric)
-        return currency.alpha_3 if currency else None
+def get_currency_from_country_code(alpha_3_code):
+    try:
+        country = pycountry.countries.get(alpha_3=alpha_3_code.upper())
+        if not country:
+            return None
+
+        alpha_2 = country.alpha_2
+        currencies = get_territory_currencies(alpha_2)
+        if currencies:
+            return currencies[0]
+    except Exception as e:
+        print(f"Error getting currency for {alpha_3_code}: {e}")
     return None
 
-# ========== ETLs ==========
 
+# ETL de Produtos, Transportes e Países
 def etl_products():
     query = """
         SELECT p.id AS id_produto, p.descricao, cp.descricao AS ds_categoria, codigo_ncm
@@ -99,8 +103,8 @@ def etl_countries():
     df = df.select("sk_pais", "id_pais", "pais", "codigo_iso", "nm_bloco")
     load_to_data_mart(df, "dm_pais")
 
-# ========== Exchange Rates ==========
 
+# ETL de Câmbio
 @udf(StringType())
 def fetch_exchange_rate(date, from_currency, to_currency):
     try:
@@ -137,21 +141,23 @@ def etl_exchange_rates():
     load_to_data_mart(df, "dm_cambios")
     return df
 
-def etl_dim_tempo_from_exchange(exchange_df):
+# ETL de Tempo
+def etl_dm_tempo_from_exchange(exchange_df):
     dates_df = exchange_df.select("data").distinct()
+
     dates_df = dates_df.withColumn("ano", year(col("data"))) \
                        .withColumn("mes", month(col("data"))) \
                        .withColumn("dia", dayofmonth(col("data")))
+    
     dates_df = dates_df.withColumn("sk_tempo", row_number().over(Window.orderBy("data")))
+
     dm_tempo = dates_df.select("sk_tempo", col("data").alias("data_completa"), "ano", "mes", "dia")
     load_to_data_mart(dm_tempo, "dm_tempo")
-
-# ========== Run All ==========
 
 etl_products()
 etl_transports()
 etl_countries()
 exchange_df = etl_exchange_rates()
-etl_dim_tempo_from_exchange(exchange_df)
+etl_dm_tempo_from_exchange(exchange_df)
 
 spark.stop()
