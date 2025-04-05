@@ -209,7 +209,7 @@ def obter_variacao_cambio_exportacoes():
             JOIN public.moedas mo_origem ON c.moeda_origem = mo_origem.id
             JOIN public.moedas mo_destino ON c.moeda_destino = mo_destino.id
             WHERE tt.descricao = 'EXPORT'
-            ORDER BY c.data DESC;
+            ORDER BY c.data ASC;
         """
 
         cursor.execute(query)
@@ -267,7 +267,7 @@ def obter_variacao_cambio_import():
             JOIN public.moedas mo_origem ON c.moeda_origem = mo_origem.id
             JOIN public.moedas mo_destino ON c.moeda_destino = mo_destino.id
             WHERE tt.descricao = 'IMPORT'
-            ORDER BY c.data DESC;
+            ORDER BY c.data ASC;
         """
 
         cursor.execute(query)
