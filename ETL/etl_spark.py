@@ -83,6 +83,8 @@ def etl_products():
     df = df.select("sk_produto", "id_produto", "descricao", "codigo_ncm", "ds_categoria")
     load_to_data_mart(df, "dm_produtos")
 
+    return df
+
 def etl_transports():
     query = "SELECT id AS id_transporte, descricao AS ds_transporte FROM transportes"
     df = extract_from_principal(query)
@@ -90,6 +92,8 @@ def etl_transports():
     df = add_surrogate_key(df, "id_transporte", "sk_transporte")
     df = df.select("sk_transporte", "id_transporte", "ds_transporte")
     load_to_data_mart(df, "dm_transporte")
+
+    return df
 
 def etl_countries():
     query = """
@@ -103,6 +107,7 @@ def etl_countries():
     df = df.select("sk_pais", "id_pais", "pais", "codigo_iso", "nm_bloco")
     load_to_data_mart(df, "dm_pais")
 
+    return df
 
 # ETL de Câmbio
 @udf(StringType())
@@ -153,7 +158,7 @@ def etl_exchange_rates():
     return df
 
 # ETL de Tempo
-def etl_dm_tempo_from_exchange(exchange_df):
+def etl_time_from_exchange(exchange_df):
     dates_df = exchange_df.select("data").distinct()
 
     dates_df = dates_df.withColumn("ano", year(col("data"))) \
@@ -162,13 +167,65 @@ def etl_dm_tempo_from_exchange(exchange_df):
     
     dates_df = dates_df.withColumn("sk_tempo", row_number().over(Window.orderBy("data")))
 
-    dm_tempo = dates_df.select("sk_tempo", col("data").alias("data_completa"), "ano", "mes", "dia")
-    load_to_data_mart(dm_tempo, "dm_tempo")
+    dm_time = dates_df.select("sk_tempo", col("data").alias("data_completa"), "ano", "mes", "dia")
+    load_to_data_mart(dm_time, "dm_tempo")
 
-etl_products()
-etl_transports()
-etl_countries()
+    return dm_time
+
+# ETL da Tabela Fatos
+def etl_facts():
+    query = """ 
+        SELECT 
+            t.id AS id_transacao, 
+            t.quantidade, 
+            t.valor_monetario, 
+            t.id_produto, 
+            t.id_transporte, 
+            t.id_pais_origem, 
+            t.id_pais_destino,
+            t.id_cambio,
+            tt.descricao AS tp_transacao
+            c.data as id_tempo
+        FROM transacoes t
+        INNER JOIN tipos_transacoes tt ON tt.id = t.tipo_id
+        INNER JOIN cambios c ON c.id = t.id_cambio
+    """
+
+    df = extract_from_principal(query)
+    df = transform_text_to_uppercase(df, ["tp_transacao"])
+
+    df = add_surrogate_key(df, "id_transacao", "sk_transacao")
+
+    df = df \
+        .join(products_df.select("id_produto", "sk_produto"), on="id_produto", how="inner") \
+        .join(transports_df.select("id_transporte", "sk_transporte"), on="id_transporte", how="inner") \
+        .join(countries_df.select(col("id_pais").alias("id_pais_origem"), col("sk_pais").alias("sk_pais_origem")),
+              on="id_pais_origem", how="inner") \
+        .join(countries_df.select(col("id_pais").alias("id_pais_destino"), col("sk_pais").alias("sk_pais_destino")),
+              on="id_pais_destino", how="inner") \
+        .join(exchange_df.select("id_cambio", "sk_cambio"), on="id_cambio", how="inner") \
+        .join(time_df.select("data", "sk_tempo"), on="data", how="inner")
+
+    df = df.select(
+        "sk_transacao",
+        "sk_transporte",
+        "sk_pais_origem",
+        "sk_pais_destino",
+        "sk_produto",
+        "sk_cambio",
+        "sk_tempo",
+        "valor_monetario",
+        "quantidade",
+        "tp_transacao"
+    )
+
+    load_to_data_mart(df, "ft_transacoes")
+    return df
+
+products_df = etl_products()
+transports_df = etl_transports()
+countries_df = etl_countries()
 exchange_df = etl_exchange_rates()
-etl_dm_tempo_from_exchange(exchange_df)
+time_df = etl_time_from_exchange(exchange_df)
 
 spark.stop()

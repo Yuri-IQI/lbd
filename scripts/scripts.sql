@@ -285,21 +285,16 @@ CREATE TABLE DM_Transporte (
 );
 
 CREATE TABLE FT_Transacoes (
-	id_transporte int4 NOT NULL REFERENCES DM_Transporte (sk_transporte),
-	id_pais_origem int4 NOT NULL REFERENCES DM_Pais (sk_pais),
-	id_pais_destino int4 NOT NULL REFERENCES DM_Pais (sk_pais),
-	id_produto int4 NOT NULL REFERENCES DM_Produtos (sk_produto),
-	id_tempo int4 NOT NULL REFERENCES DM_Tempo (sk_tempo),
-	id_cambios int4 NOT NULL REFERENCES DM_Cambios (sk_cambio),
+	sk_transacao int4 NOT NULL,
+	sk_transacao int4 NOT NULL,
+	sk_transporte int4 NOT NULL REFERENCES DM_Transporte (sk_transporte),
+	sk_pais_origem int4 NOT NULL REFERENCES DM_Pais (sk_pais),
+	sk_pais_destino int4 NOT NULL REFERENCES DM_Pais (sk_pais),
+	sk_produto int4 NOT NULL REFERENCES DM_Produtos (sk_produto),
+	sk_tempo int4 NOT NULL REFERENCES DM_Tempo (sk_tempo),
+	sk_cambios int4 NOT NULL REFERENCES DM_Cambios (sk_cambio),
 	valor_monetario numeric(15,2) NOT NULL,
 	quantidade int4 NOT NULL,
 	tp_transacao varchar(10),
-	PRIMARY KEY (
-		id_transporte,
-		id_pais_origem,
-		id_pais_destino,
-		id_produto,
-		id_tempo,
-		id_cambios
-	)
+	PRIMARY KEY (sk_transacao)
 );
