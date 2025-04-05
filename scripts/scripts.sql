@@ -286,7 +286,7 @@ CREATE TABLE DM_Transporte (
 
 CREATE TABLE FT_Transacoes (
 	sk_transacao int4 NOT NULL,
-	sk_transacao int4 NOT NULL,
+	id_transacao int4 NOT NULL,
 	sk_transporte int4 NOT NULL REFERENCES DM_Transporte (sk_transporte),
 	sk_pais_origem int4 NOT NULL REFERENCES DM_Pais (sk_pais),
 	sk_pais_destino int4 NOT NULL REFERENCES DM_Pais (sk_pais),
