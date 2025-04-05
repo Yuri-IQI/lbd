@@ -1,4 +1,4 @@
-# Projeto de Laboratório de Banco de Dados
+# Acesso ao Banco
 
 ## Ambiente Local
 
@@ -38,6 +38,41 @@ Caso nenhuma informação tenha sido retornada pela consulta, verifique se ocorr
 docker logs spark_job
 ```
 
+## Ambiente da VM
 
+### Conectando ao Banco da VM
 
-O arquivo .env está configurado para executar expor o banco na 5445, para mudar a porta, apenas mude o valor da variável DB_PORT.
+Na VM, existe um container postgres sendo executado contendo o banco principal e o data mart. 
+
+Para se conectar ao banco na vm, consulte os métodos de conexão no [colab](https://colab.research.google.com/drive/1viZIOcaQYkDnhfeNsdSMdQzNU8VktmWr?usp=sharing) e use o mesmo usuário e senha do ETL.
+
+# Explicação do ETL
+
+## Funções Gerais
+No começo do código do ETL, são declaradas algumas funções que generalizam o processo de ETL e são comuns no tratamento da maioria das tabelas.
+
+**extract_from_principal**
+> Essa função é usada para realizar a extração de dados do banco principal, ela utiliza uma consulta para gerar um dataframe com base nos resultados.
+
+**transform_text_to_column**
+> Essa é uma função de tratamento aplicada a todos os campos de texto do banco, ela recebe um dataframe e uma lista de colunas e então ela itera sobre as colunas da lista e passa o texto para maiusculo.
+
+**load_to_data_mart**
+> Essa é a função de carga para o data mart, ela recebe o dataframe com os dados tratados e o nome da tabela no banco do data mart em que os dados do dataframe devem ser inseridos.
+
+**add_surrogate_key**
+> Essa função é usada para criar uma surrogate key que será uma chave primária própria do data mart, ela recebe um dataframe e o nome da coluna de chave primaria no banco principal com isso ela cria e nomeia a surrogate key com base no nome e valor da chave natural.
+
+**get_currency_from_country_code**
+> No banco principal, exceto por uma entrada, a tabela de moedas não utiliza o nome das moedas dos paises, ao invés disso, ela utiliza as siglas dos paises. Porém a API frankfurter só permite a busca utilizando as moedas, então essa função utiliza as bibliotecas babel e pycountry para converter a sigla do país para o nome da moeda.
+
+**etl_products**
+> Essa é a função que realiza o processo de ETL para a dimensão produtos, ela apenas extrai os dados dos produtos e das categorias, tranformas os campos de texto para maiusculo e cria uma sk antes de fazer a carga no data mart.
+
+**etl_transports**
+> Essa função segue o mesmo padrão de etl_products para fazer o etl da dimensão de transportes.
+
+**etl_countries**
+> Essa função segue o mesmo padrão da etl_products e da etl_transports para fazer o etl para a dimensão paises.
+
+# 死にたい
