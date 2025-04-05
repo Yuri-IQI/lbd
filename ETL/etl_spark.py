@@ -106,17 +106,28 @@ def etl_countries():
 
 # ETL de Câmbio
 @udf(StringType())
-def fetch_exchange_rate(date, from_currency, to_currency):
-    try:
-        origin = get_currency_from_country_code(from_currency)
-        destination = get_currency_from_country_code(to_currency)
+def fetch_exchange_rate(date, from_country_code, to_country_code):
+    if from_country_code == 'EUR':
+        origin = 'EUR'
+        destination = get_currency_from_country_code(to_country_code)
 
-        res = requests.get(f"https://api.frankfurter.dev/v1/latest?from={origin}&to={destination}")
+    elif to_country_code == 'EUR':
+        origin = get_currency_from_country_code(from_country_code)
+        destination = 'EUR'
+    else:
+        origin = get_currency_from_country_code(from_country_code)
+        destination = get_currency_from_country_code(to_country_code)
+
+    try:
+        if not origin or not destination:
+            return None
+
+        res = requests.get(f"https://api.frankfurter.dev/v1/{date}?from={origin}&to={destination}")
         res.raise_for_status()
-        return 1
+        rate = res.json().get("rates", {}).get(destination)
+        return str(rate) if rate else None
     except Exception as e:
-        print(f"API error: {e}")
-        return 2
+        return None
 
 def etl_exchange_rates():
     query = """
@@ -130,7 +141,7 @@ def etl_exchange_rates():
     """
     df = extract_from_principal(query)
     df = transform_text_to_uppercase(df, ["ds_moeda_origem", "pais_moeda_origem", "ds_moeda_destino", "pais_moeda_destino"])
-    df = df.withColumn("taxa_cambio", fetch_exchange_rate(col("data"), col("ds_moeda_origem"), col("ds_moeda_destino")).cast(FloatType()))
+    df = df.withColumn("taxa_cambio", fetch_exchange_rate(col("data"), col("pais_moeda_origem"), col("pais_moeda_destino")).cast(FloatType()))
     df = add_surrogate_key(df, "id_cambio", "sk_cambio")
 
     df = df.select(
