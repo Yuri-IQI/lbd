@@ -1,170 +1,157 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import upper, col, udf, row_number
-import os
+from pyspark.sql.functions import (
+    upper, col, udf, row_number,
+    year, month, dayofmonth
+)
+from pyspark.sql.types import StringType, FloatType
+from pyspark.sql.window import Window
 from dotenv import load_dotenv
 import requests
-from pyspark.sql.types import StringType
-from pyspark.sql.window import Window
+import os
+import pycountry
 
+# Load environment variables
 load_dotenv()
+db_url = os.getenv("DB_URL")
 
+# Spark session config
 spark = SparkSession.builder \
-    .appName("LBD") \
+    .appName("LBD Dimensional ETL") \
     .master("local[*]") \
     .config("spark.jars.packages", "org.postgresql:postgresql:42.2.16") \
     .getOrCreate()
 
-db_url = os.getenv("DB_URL")
-
+# DB connection properties
 db_properties = {
     "user": "postgres",
     "password": "postgres",
     "driver": "org.postgresql.Driver"
 }
 
-# Funções básicas para o ETL
+# ========== Helper Functions ==========
 
-def extract_from_principal(query):
+def extract_from_principal(query: str):
     return spark.read \
         .format("jdbc") \
-        .option("url", db_url + "/star_comex_principal") \
+        .option("url", f"{db_url}/star_comex_principal") \
         .option("query", query) \
         .options(**db_properties) \
         .load()
 
-def transform_text_to_uppercase(df, columns):
+def transform_text_to_uppercase(df, columns: list):
     for column in columns:
         df = df.withColumn(column, upper(col(column)))
     return df
 
-def load_to_data_mart(df, table_name):
+def load_to_data_mart(df, table_name: str):
     df.write \
         .mode("append") \
         .format("jdbc") \
-        .option("url", db_url + "/star_comex_data_mart") \
+        .option("url", f"{db_url}/star_comex_data_mart") \
         .option("dbtable", table_name) \
-        .option("user", db_properties["user"]) \
-        .option("password", db_properties["password"]) \
-        .option("driver", db_properties["driver"]) \
+        .options(**db_properties) \
         .save()
 
-# ETL de produtos
+def add_surrogate_key(df, key_column: str, sk_name: str = None):
+    if sk_name is None:
+        sk_name = f"sk_{key_column.replace('id_', '')}"
+    window = Window.orderBy(key_column)
+    return df.withColumn(sk_name, row_number().over(window))
 
-products_query = """select p.id as id_produto, p.descricao, cp.descricao as ds_categoria, codigo_ncm from produtos p 
-    inner join categoria_produtos cp on cp.id = p.categoria_id"""
-
-# Extração das tabelas de produtos e categoria_produtos
-products_extract = extract_from_principal(products_query)
-
-# Transformação
-products_transformed = transform_text_to_uppercase(products_extract, ["descricao", "codigo_ncm", "ds_categoria"])
-
-# Adiciona surrogate key
-window = Window.orderBy("id_produto")
-products_with_sk = products_transformed.withColumn("sk_produto", row_number().over(window))
-
-# Reorganiza colunas
-dm_produtos = products_with_sk.select(
-    "sk_produto", "id_produto", "descricao", "codigo_ncm", "ds_categoria"
-)
-
-# Carregamento
-load_to_data_mart(dm_produtos, "dm_produtos")
-
-
-# ETL de transportes
-
-transports_query = "select id as id_transporte, descricao as ds_transporte from transportes"
-transports_extract = extract_from_principal(transports_query)
-transports_transformed = transform_text_to_uppercase(transports_extract, ["ds_transporte"])
-
-window = Window.orderBy("id_transporte")
-transports_with_sk = transports_transformed.withColumn("sk_transporte", row_number().over(window))
-
-dm_transporte = transports_with_sk.select("sk_transporte", "id_transporte", "ds_transporte")
-load_to_data_mart(dm_transporte, "dm_transporte")
-
-# ETL de países
-
-countries_query = """select p.id as id_pais, p.nome as pais, p.codigo_iso, b.nome as nm_bloco
-  from paises p inner join blocos_economicos b on b.id = p.bloco_id"""
-countries_extract = extract_from_principal(countries_query)
-countries_transformed = transform_text_to_uppercase(countries_extract, ["pais", "codigo_iso", "nm_bloco"])
-
-window = Window.orderBy("id_pais")
-countries_with_sk = countries_transformed.withColumn("sk_pais", row_number().over(window))
-
-dm_pais = countries_with_sk.select("sk_pais", "id_pais", "pais", "codigo_iso", "nm_bloco")
-load_to_data_mart(dm_pais, "dm_pais")
-
-
-# ETL de tempos
-
-@udf(StringType())
-def extract_time(date):
-    if date is not None:
-        date_str = str(date)
-        if len(date_str) >= 10:
-            year = date_str[0:4]
-            month = date_str[5:7]
-            day = date_str[8:10]
-            print(f"Ano: {year}, Mês: {month}, Dia: {day}")
-            do_time_etl(year, month, day)
-
-            return f"{year}{month}{day}"
+def get_currency_from_country_code(country_code):
+    country = pycountry.countries.get(alpha_3=country_code.upper())
+    if country:
+        currency = pycountry.currencies.get(numeric=country.numeric)
+        return currency.alpha_3 if currency else None
     return None
 
-def do_time_etl(year, month, day):
-    tima_data = [{}]
+# ========== ETLs ==========
 
-    spark.createDataFrame
+def etl_products():
+    query = """
+        SELECT p.id AS id_produto, p.descricao, cp.descricao AS ds_categoria, codigo_ncm
+        FROM produtos p
+        INNER JOIN categoria_produtos cp ON cp.id = p.categoria_id
+    """
+    df = extract_from_principal(query)
+    df = transform_text_to_uppercase(df, ["descricao", "codigo_ncm", "ds_categoria"])
+    df = add_surrogate_key(df, "id_produto", "sk_produto")
+    df = df.select("sk_produto", "id_produto", "descricao", "codigo_ncm", "ds_categoria")
+    load_to_data_mart(df, "dm_produtos")
 
-# ETL de cambios
+def etl_transports():
+    query = "SELECT id AS id_transporte, descricao AS ds_transporte FROM transportes"
+    df = extract_from_principal(query)
+    df = transform_text_to_uppercase(df, ["ds_transporte"])
+    df = add_surrogate_key(df, "id_transporte", "sk_transporte")
+    df = df.select("sk_transporte", "id_transporte", "ds_transporte")
+    load_to_data_mart(df, "dm_transporte")
 
-exchange_query = """
-    select c.id as id_cambio, c.data,
-           m1.descricao as ds_moeda_origem, m1.pais as pais_moeda_origem,
-           m2.descricao as ds_destino, m2.pais as pais_moeda_destino,
-           c.taxa_cambio
-    from cambios c
-    inner join moedas m1 on m1.id = c.moeda_origem
-    inner join moedas m2 on m2.id = c.moeda_destino
-"""
+def etl_countries():
+    query = """
+        SELECT p.id AS id_pais, p.nome AS pais, p.codigo_iso, b.nome AS nm_bloco
+        FROM paises p
+        INNER JOIN blocos_economicos b ON b.id = p.bloco_id
+    """
+    df = extract_from_principal(query)
+    df = transform_text_to_uppercase(df, ["pais", "codigo_iso", "nm_bloco"])
+    df = add_surrogate_key(df, "id_pais", "sk_pais")
+    df = df.select("sk_pais", "id_pais", "pais", "codigo_iso", "nm_bloco")
+    load_to_data_mart(df, "dm_pais")
 
-# Atualizar para pegar cambios por range. ex: https://api.frankfurter.dev/v1/2023-12-01..2023-12-10?amount=100&from=GBP&to=USD
+# ========== Exchange Rates ==========
+
 @udf(StringType())
-def update_exchange_rate(date, currency_from, currency_to):
+def fetch_exchange_rate(date, from_currency, to_currency):
     try:
-        res = requests.get(
-            f"https://api.frankfurter.dev/v1/{date}?from={currency_from}&to={currency_to}"
-        ).json()
-        return str(res["rates"][currency_to])
+        origin = get_currency_from_country_code(from_currency)
+        destination = get_currency_from_country_code(to_currency)
+
+        res = requests.get(f"https://api.frankfurter.dev/v1/latest?from={origin}&to={destination}")
+        res.raise_for_status()
+        return 1
     except Exception as e:
-        print(f"Erro na API: {e}")
-        return None
+        print(f"API error: {e}")
+        return 2
 
-exchange_extract = extract_from_principal(exchange_query)
+def etl_exchange_rates():
+    query = """
+        SELECT c.id AS id_cambio, c.data,
+               m1.descricao AS ds_moeda_origem, m1.pais AS pais_moeda_origem,
+               m2.descricao AS ds_moeda_destino, m2.pais AS pais_moeda_destino,
+               c.taxa_cambio
+        FROM cambios c
+        INNER JOIN moedas m1 ON m1.id = c.moeda_origem
+        INNER JOIN moedas m2 ON m2.id = c.moeda_destino
+    """
+    df = extract_from_principal(query)
+    df = transform_text_to_uppercase(df, ["ds_moeda_origem", "pais_moeda_origem", "ds_moeda_destino", "pais_moeda_destino"])
+    df = df.withColumn("taxa_cambio", fetch_exchange_rate(col("data"), col("ds_moeda_origem"), col("ds_moeda_destino")).cast(FloatType()))
+    df = add_surrogate_key(df, "id_cambio", "sk_cambio")
 
-exchange_transformed = transform_text_to_uppercase(
-    exchange_extract,
-    ["ds_moeda_origem", "pais_moeda_origem", "ds_destino", "pais_moeda_destino"]
-)
+    df = df.select(
+        "sk_cambio", "id_cambio", "data",
+        "ds_moeda_origem", "pais_moeda_origem",
+        "ds_moeda_destino", "pais_moeda_destino", "taxa_cambio"
+    )
+    load_to_data_mart(df, "dm_cambios")
+    return df
 
-exchange_transformed = exchange_transformed.withColumn("data", extract_time(col("data")))
+def etl_dim_tempo_from_exchange(exchange_df):
+    dates_df = exchange_df.select("data").distinct()
+    dates_df = dates_df.withColumn("ano", year(col("data"))) \
+                       .withColumn("mes", month(col("data"))) \
+                       .withColumn("dia", dayofmonth(col("data")))
+    dates_df = dates_df.withColumn("sk_tempo", row_number().over(Window.orderBy("data")))
+    dm_tempo = dates_df.select("sk_tempo", col("data").alias("data_completa"), "ano", "mes", "dia")
+    load_to_data_mart(dm_tempo, "dm_tempo")
 
-exchange_transformed = exchange_transformed.withColumn(
-    "taxa_cambio",
-    update_exchange_rate(col("data"), col("ds_moeda_origem"), col("ds_destino"))
-)
+# ========== Run All ==========
 
-window = Window.orderBy("id_cambio")
-exchange_with_sk = exchange_transformed.withColumn("sk_cambio", row_number().over(window))
-
-dm_cambio = exchange_with_sk.select(
-    "sk_cambio", "id_cambio", "data", "ds_moeda_origem", "pais_moeda_origem",
-    "ds_destino", "pais_moeda_destino", "taxa_cambio"
-)
-
-load_to_data_mart(dm_cambio, "dm_cambios")
+etl_products()
+etl_transports()
+etl_countries()
+exchange_df = etl_exchange_rates()
+etl_dim_tempo_from_exchange(exchange_df)
 
 spark.stop()
