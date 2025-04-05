@@ -292,7 +292,7 @@ CREATE TABLE FT_Transacoes (
 	sk_pais_destino int4 NOT NULL REFERENCES DM_Pais (sk_pais),
 	sk_produto int4 NOT NULL REFERENCES DM_Produtos (sk_produto),
 	sk_tempo int4 NOT NULL REFERENCES DM_Tempo (sk_tempo),
-	sk_cambios int4 NOT NULL REFERENCES DM_Cambios (sk_cambio),
+	sk_cambio int4 NOT NULL REFERENCES DM_Cambios (sk_cambio),
 	valor_monetario numeric(15,2) NOT NULL,
 	quantidade int4 NOT NULL,
 	tp_transacao varchar(10),
