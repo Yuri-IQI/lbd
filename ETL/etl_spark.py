@@ -175,39 +175,39 @@ def etl_time_from_exchange(exchange_df):
 # ETL da Tabela Fatos
 def etl_facts():
     query = """ 
-        SELECT 
-            t.id AS id_transacao, 
-            t.quantidade, 
-            t.valor_monetario, 
-            t.id_produto, 
-            t.id_transporte, 
-            t.id_pais_origem, 
-            t.id_pais_destino,
-            t.id_cambio,
-            tt.descricao AS tp_transacao
-            c.data as id_tempo
+        SELECT
+            t.id AS id_transacao,
+            t.quantidade,
+            t.valor_monetario,
+            t.produto_id,
+            t.transporte_id,
+            t.pais_origem,
+            t.pais_destino,
+            t.cambio_id,
+            tt.descricao AS tp_transacao,
+            c.data AS data_transacao
         FROM transacoes t
         INNER JOIN tipos_transacoes tt ON tt.id = t.tipo_id
-        INNER JOIN cambios c ON c.id = t.id_cambio
+        INNER JOIN cambios c ON c.id = t.cambio_id
     """
 
     df = extract_from_principal(query)
     df = transform_text_to_uppercase(df, ["tp_transacao"])
-
     df = add_surrogate_key(df, "id_transacao", "sk_transacao")
 
     df = df \
-        .join(products_df.select("id_produto", "sk_produto"), on="id_produto", how="inner") \
-        .join(transports_df.select("id_transporte", "sk_transporte"), on="id_transporte", how="inner") \
-        .join(countries_df.select(col("id_pais").alias("id_pais_origem"), col("sk_pais").alias("sk_pais_origem")),
-              on="id_pais_origem", how="inner") \
-        .join(countries_df.select(col("id_pais").alias("id_pais_destino"), col("sk_pais").alias("sk_pais_destino")),
-              on="id_pais_destino", how="inner") \
-        .join(exchange_df.select("id_cambio", "sk_cambio"), on="id_cambio", how="inner") \
-        .join(time_df.select("data", "sk_tempo"), on="data", how="inner")
+        .join(products_df.select("id_produto", "sk_produto"), df["produto_id"] == products_df["id_produto"], "inner") \
+        .join(transports_df.select("id_transporte", "sk_transporte"), df["transporte_id"] == transports_df["id_transporte"], "inner") \
+        .join(countries_df.select(col("id_pais").alias("pais_origem"), col("sk_pais").alias("sk_pais_origem")),
+              on="pais_origem", how="inner") \
+        .join(countries_df.select(col("id_pais").alias("pais_destino"), col("sk_pais").alias("sk_pais_destino")),
+              on="pais_destino", how="inner") \
+        .join(exchange_df.select("id_cambio", "sk_cambio"), df["cambio_id"] == exchange_df["id_cambio"], "inner") \
+        .join(time_df.select(col("data_completa").alias("data_transacao"), "sk_tempo"), on="data_transacao", how="inner")
 
     df = df.select(
         "sk_transacao",
+        "id_transacao",
         "sk_transporte",
         "sk_pais_origem",
         "sk_pais_destino",
@@ -227,5 +227,6 @@ transports_df = etl_transports()
 countries_df = etl_countries()
 exchange_df = etl_exchange_rates()
 time_df = etl_time_from_exchange(exchange_df)
+facts_df = etl_facts()
 
 spark.stop()
