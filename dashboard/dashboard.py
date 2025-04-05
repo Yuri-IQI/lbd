@@ -107,8 +107,29 @@ def grafico_linha(titulo, categorias, valores, x_title, y_title):
     st.plotly_chart(fig, use_container_width=True)
 
 def grafico_pizza(titulo, categorias, valores):
-    fig = go.Figure(data=[go.Pie(labels=categorias, values=valores)])
-    fig.update_layout(title=titulo, height=500)
+    fig = go.Figure(data=[go.Pie(
+        labels=categorias,
+        values=valores,
+        hole=0.4,
+        textinfo='label+percent',
+        textfont=dict(size=16),
+        marker=dict(line=dict(color='#000000', width=2))
+    )])
+
+    fig.update_layout(
+        title=titulo,
+        title_font=dict(size=24),
+        legend_title="Categorias",
+        legend=dict(
+            font=dict(size=18),
+            orientation="v",
+            x=1,
+            y=0.5
+        ),
+        margin=dict(l=20, r=20, t=80, b=20),
+        height=500
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
 # Exportações por País
