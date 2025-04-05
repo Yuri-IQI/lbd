@@ -4,75 +4,162 @@
 
 ### Utilizando Docker
 
-Para subir o container do banco e do ETL apenas execute o seguinte comando na pasta raís:
+Para subir os containers do banco de dados e do ETL, execute o seguinte comando na pasta raiz do projeto:
+
 ```bash
 docker compose up -d
 ```
 
-Após subir o container, verificar se o banco está rodando com o seguinte comando:
+Após subir os containers, verifique se o banco está rodando com:
+
 ```bash
 docker ps
 ```
 
-O container do banco deverá ser listado no terminal após a execucação do comando, quanto ao container do ETL, ele deverá apenas executar o job e parar, portanto ele pode não estar visível na lista.
-Se o container do spark estiver listado ele ainda não finalizou o job.
+O container do banco deve aparecer listado no terminal.  
+O container do ETL executa o job e finaliza em seguida, portanto ele **pode não aparecer** na lista após a execução.
 
-Para verificar se o job foi executado faça os seguintes passos:
-1. Entre no container do banco: \
-`docker exec -it postgres bash`
+Se o container do Spark ainda estiver listado, é porque o job ainda está em execução.
 
-3. Entre no banco com: \
-`psql -U postgres`
+---
 
-5. Entre no banco do data mart com: \
-`\c star_comex_data_mart`
+### Verificando a Execução do Job ETL
 
-7. Faça um select na tabela fatos para saber se o ETL foi executado: \
-`select * from ft_transacoes;`
+1. Acesse o container do banco de dados:
+   ```bash
+   docker exec -it postgres bash
+   ```
 
-8. saia do banco e do container com o comando:
-`exit`
+2. Acesse o PostgreSQL:
+   ```bash
+   psql -U postgres
+   ```
 
-Caso nenhuma informação tenha sido retornada pela consulta, verifique se ocorreu algum erro no container do spark:
+3. Conecte-se ao banco do Data Mart:
+   ```sql
+   \c star_comex_data_mart
+   ```
+
+4. Verifique se há registros na tabela de fatos:
+   ```sql
+   SELECT * FROM ft_transacoes;
+   ```
+
+5. Saia do banco e do container com:
+   ```bash
+   exit
+   ```
+
+Se nenhuma informação for retornada, verifique os logs do container Spark:
+
 ```bash
 docker logs spark_job
 ```
+
+---
 
 ## Ambiente da VM
 
 ### Conectando ao Banco da VM
 
-Na VM, existe um container postgres sendo executado contendo o banco principal e o data mart. 
+Na máquina virtual (VM), um container PostgreSQL está em execução contendo tanto o **banco principal** quanto o **Data Mart**.
 
-Para se conectar ao banco na vm, consulte os métodos de conexão no [colab](https://colab.research.google.com/drive/1viZIOcaQYkDnhfeNsdSMdQzNU8VktmWr?usp=sharing) e use o mesmo usuário e senha do ETL.
+Para se conectar ao banco da VM:
 
-# Explicação do ETL
+- Acesse os métodos de conexão descritos neste [notebook do Colab](https://colab.research.google.com/drive/1viZIOcaQYkDnhfeNsdSMdQzNU8VktmWr?usp=sharing)
+- Utilize as mesmas **credenciais de usuário e senha** utilizadas pelo ETL
 
-## Funções Gerais
-No começo do código do ETL, são declaradas algumas funções que generalizam o processo de ETL e são comuns no tratamento da maioria das tabelas.
+## Explicação do ETL
 
-**extract_from_principal**
-> Essa função é usada para realizar a extração de dados do banco principal, ela utiliza uma consulta para gerar um dataframe com base nos resultados.
+Abaixo estão descritas as funções que compõem o pipeline de ETL, organizadas conforme sua responsabilidade no processo de extração, transformação e carga dos dados.
 
-**transform_text_to_column**
-> Essa é uma função de tratamento aplicada a todos os campos de texto do banco, ela recebe um dataframe e uma lista de colunas e então ela itera sobre as colunas da lista e passa o texto para maiusculo.
+---
 
-**load_to_data_mart**
-> Essa é a função de carga para o data mart, ela recebe o dataframe com os dados tratados e o nome da tabela no banco do data mart em que os dados do dataframe devem ser inseridos.
+### 🔹 `extract_from_principal()`
 
-**add_surrogate_key**
-> Essa função é usada para criar uma surrogate key que será uma chave primária própria do data mart, ela recebe um dataframe e o nome da coluna de chave primaria no banco principal com isso ela cria e nomeia a surrogate key com base no nome e valor da chave natural.
+Realiza a **extração de dados do banco principal** a partir de uma consulta SQL.  
+Retorna os resultados da query como um DataFrame do Spark.
 
-**get_currency_from_country_code**
-> No banco principal, exceto por uma entrada, a tabela de moedas não utiliza o nome das moedas dos paises, ao invés disso, ela utiliza as siglas dos paises. Porém a API frankfurter só permite a busca utilizando as moedas, então essa função utiliza as bibliotecas babel e pycountry para converter a sigla do país para o nome da moeda.
+---
 
-**etl_products**
-> Essa é a função que realiza o processo de ETL para a dimensão produtos, ela apenas extrai os dados dos produtos e das categorias, tranformas os campos de texto para maiusculo e cria uma sk antes de fazer a carga no data mart.
+### 🔹 `transform_text_to_column(df, columns: list)`
 
-**etl_transports**
-> Essa função segue o mesmo padrão de etl_products para fazer o etl da dimensão de transportes.
+Aplica **tratamento padronizado em colunas de texto**.  
+Recebe um DataFrame e uma lista de colunas e converte o conteúdo dessas colunas para **maiúsculas**.
 
-**etl_countries**
-> Essa função segue o mesmo padrão da etl_products e da etl_transports para fazer o etl para a dimensão paises.
+---
 
-# 死にたい
+### 🔹 `load_to_data_mart(df, table_name: str)`
+
+Responsável por realizar a **carga de dados no Data Mart**.  
+Recebe um DataFrame tratado e o nome da tabela destino no Data Mart, e realiza a inserção dos dados.
+
+---
+
+### 🔹 `add_surrogate_key(df, natural_key_column: str)`
+
+Gera uma **chave substituta (surrogate key)** com base na chave natural.  
+É utilizada para criar uma nova chave primária interna ao Data Mart, mantendo a integridade das dimensões.
+
+---
+
+### 🔹 `get_currency_from_country_code(country_code: str)`
+
+Converte **códigos de países (siglas ISO)** para **nomes de moedas**.  
+Isso é necessário pois a API [Frankfurter](https://www.frankfurter.app) aceita apenas nomes de moedas como parâmetro.  
+A função utiliza as bibliotecas `babel` e `pycountry` para realizar a conversão.
+
+---
+
+### 🔹 `etl_products()`
+
+Executa o processo de ETL para a **dimensão produtos**:
+- Extrai dados de produtos e categorias
+- Aplica transformação em colunas de texto
+- Gera surrogate keys
+- Realiza a carga no Data Mart
+
+---
+
+### 🔹 `etl_transports()`
+
+Executa o processo de ETL para a **dimensão transportes**, seguindo a mesma estrutura da função `etl_products`.
+
+---
+
+### 🔹 `etl_countries()`
+
+Executa o processo de ETL para a **dimensão países**, também utilizando a mesma abordagem usada nas dimensões anteriores.
+
+---
+
+### 🔹 `etl_exchange_rates()`
+
+Realiza o ETL da **dimensão de câmbio**:
+- Substitui as taxas de câmbio do banco principal por taxas obtidas via API Frankfurter.
+- Utiliza a função `fetch_exchange_rate()` passando a data e os países envolvidos para obter a taxa atualizada.
+
+---
+
+### 🔹 `fetch_exchange_rate(date, from_country_code, to_country)`
+
+Obtém a taxa de câmbio entre dois países em uma data específica:  
+- Converte os códigos dos países em moedas utilizando `get_currency_from_country_code`
+- Consulta a API Frankfurter para retornar a taxa de câmbio correta
+
+---
+
+### 🔹 `etl_time_from_exchange(exchange_df)`
+
+Recebe o DataFrame com as taxas de câmbio e extrai a **dimensão temporal**, com base nas datas das transações de câmbio.
+
+---
+
+### 🔹 `etl_facts()`
+
+Executa o ETL da **tabela fato**, unificando os dados:
+- Extrai as transações do banco principal
+- Realiza joins com todas as dimensões previamente criadas
+- Prepara os dados para análise no Data Mart
+
+---
