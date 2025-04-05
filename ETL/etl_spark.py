@@ -21,8 +21,8 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 db_properties = {
-    "user": "postgres",
-    "password": "postgres",
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
     "driver": "org.postgresql.Driver"
 }
 
