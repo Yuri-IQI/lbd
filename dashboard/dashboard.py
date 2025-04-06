@@ -34,8 +34,7 @@ aba = st.sidebar.selectbox(
     "",
     [
         "Exportações por País",
-        "Volume de Exportação por Produto",
-        "Volume de Importação por Produto",
+        "Volume de Importação/Exportação por Produto",
         "Valor Total Exportado por Ano",
         "Valor Total Importado por Ano",
         "Comércio por Bloco Econômico",
@@ -131,6 +130,36 @@ def grafico_pizza(titulo, categorias, valores):
 
     st.plotly_chart(fig, use_container_width=True)
 
+def grafico_barras_duplas(titulo, dataset, left_bar, right_bar):
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=dataset,
+        y=left_bar,
+        name="Importações",
+        marker_color='#FF9878'
+    ))
+
+    fig.add_trace(go.Bar(
+        x=dataset,
+        y=right_bar,
+        name="Exportações",
+        marker_color='#C8FF78'
+    ))
+
+    fig.update_layout(
+        title=titulo,
+        xaxis_title="Produto",
+        yaxis_title="Volume",
+        barmode='group',
+        template="plotly_white",
+        margin=dict(l=40, r=40, t=80, b=60),
+        height=500,
+        font=dict(size=14)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
 # Exportações por País
 if aba == "Exportações por País":
     dados = consultaBanco.obter_exportacoes_por_pais()
@@ -141,25 +170,28 @@ if aba == "Exportações por País":
     else:
         st.warning("Nenhum dado encontrado.")
 
-# Possibilidade, juntar importação e exportação em um gráfico de barras duplas
+# Volume de Importação/Exportação por Produto
+elif aba == "Volume de Importação/Exportação por Produto":
+    dados_import = consultaBanco.obter_volume_importacoes_por_produto()
+    dados_export = consultaBanco.obter_volume_exportacoes_por_produto()
 
-# Volume de Exportação por Produto
-elif aba == "Volume de Exportação por Produto":
-    dados = consultaBanco.obter_volume_exportacoes_por_produto()
-    if dados:
-        produtos = [linha[0] for linha in dados]
-        volumes = [linha[1] for linha in dados]
-        grafico_colunas("📦 Volume de Exportação por Produto", produtos, volumes, "Produto", "Volume Exportado")
-    else:
-        st.warning("Nenhum dado encontrado.")
+    if dados_import and dados_export:
+        produtos_import = [linha[0] for linha in dados_import]
+        volumes_import = [linha[1] for linha in dados_import]
 
-# Volume de Importação por Produto
-elif aba == "Volume de Importação por Produto":
-    dados = consultaBanco.obter_volume_importacoes_por_produto()
-    if dados:
-        produtos = [linha[0] for linha in dados]
-        volumes = [linha[1] for linha in dados]
-        grafico_colunas("📥 Volume de Importação por Produto", produtos, volumes, "Produto", "Volume Importado")
+        produtos_export = [linha[0] for linha in dados_export]
+        volumes_export = [linha[1] for linha in dados_export]
+
+        produtos_combinados = list(set(produtos_import) | set(produtos_export))
+        produtos_combinados.sort()
+
+        dict_import = dict(dados_import)
+        dict_export = dict(dados_export)
+
+        volumes_import_final = [dict_import.get(produto, 0) for produto in produtos_combinados]
+        volumes_export_final = [dict_export.get(produto, 0) for produto in produtos_combinados]
+
+        grafico_barras_duplas("📦 Volume de Comércio por Produto", produtos_combinados, volumes_import, volumes_export)
     else:
         st.warning("Nenhum dado encontrado.")
 
@@ -254,7 +286,6 @@ elif aba == "Parceiros Comerciais":
             parceiros_por_origem[origem].append((destino, f"{valor:,.2f}"))
 
         for origem, destinos in parceiros_por_origem.items():
-            # Título estilizado acima do expander
             st.markdown(
                 f"<h4 style='margin-bottom:0.2em;'>📦 {origem} - Exportações para {len(destinos)} países</h4>",
                 unsafe_allow_html=True
@@ -270,7 +301,6 @@ elif aba == "Parceiros Comerciais":
     else:
         st.warning("Nenhum dado encontrado.")
 
-
 # Variação Câmbio - Exportações
 elif aba == "Variação Câmbio - Exportações":
     dados = consultaBanco.obter_variacao_cambio_exportacoes()
@@ -282,7 +312,6 @@ elif aba == "Variação Câmbio - Exportações":
             data_raw = linha[7]
             diferenca = float(linha[10])
 
-            # Formatando a data como string legível
             if isinstance(data_raw, str):
                 data_formatada = data_raw
             else:
@@ -310,17 +339,17 @@ elif aba == "Variação Câmbio - Exportações":
         fig.update_layout(
             title=dict(
                 text="💱 Variação Cambial - Exportações por Par de Moedas",
-                font=dict(size=22)  # Tamanho do título
+                font=dict(size=22)
             ),
             xaxis_title="Data",
             yaxis_title="Diferença Cambial",
             template="plotly_white",
             height=550,
-            font=dict(size=14),  # Tamanho geral da fonte
+            font=dict(size=14),
             legend=dict(
                 title="Par de Moedas",
-                font=dict(size=16),          # Tamanho da legenda
-                title_font=dict(size=18)     # Tamanho do título da legenda
+                font=dict(size=16), 
+                title_font=dict(size=18) 
             ),
             xaxis_tickangle=-45,
             margin=dict(l=20, r=20, t=80, b=60)
@@ -388,8 +417,6 @@ elif aba == "Variação Câmbio - Importações":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Nenhum dado encontrado.")
-
-
 
 ## Distribuição por Meio de Transporte
 elif aba == "Distribuição por Meio de Transporte":

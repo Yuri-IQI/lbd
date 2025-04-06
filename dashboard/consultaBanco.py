@@ -147,14 +147,14 @@ def obter_parceiros_comerciais():
 
         query = """
             SELECT
-                p_origem.nome AS pais,
-                p_destino.nome AS parceiro_comercial,
-                SUM(t.valor_monetario) AS total_comercializado
-            FROM public.transacoes t
-            JOIN public.paises p_origem ON t.pais_origem = p_origem.id
-            JOIN public.paises p_destino ON t.pais_destino = p_destino.id
-            GROUP BY p_origem.nome, p_destino.nome
-            ORDER BY p_origem.nome, total_comercializado DESC;
+                p1.pais AS pais,
+                p2.pais AS parceiro_comercial,
+                SUM(ft.valor_monetario) AS total_comercializado
+            FROM ft_transacoes ft
+            JOIN dm_pais p1 ON ft.sk_pais_origem = p1.sk_pais
+            JOIN dm_pais p2 ON ft.sk_pais_destino = p2.sk_pais
+            GROUP BY p1.pais, p2.pais
+            ORDER BY p1.pais, total_comercializado DESC;
         """
 
         cursor.execute(query)
