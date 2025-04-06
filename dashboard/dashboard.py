@@ -2,6 +2,8 @@ import streamlit as st
 import consultaBanco
 import plotly.graph_objects as go
 import plotly.express as px
+from collections import defaultdict
+from datetime import date, datetime
 
 st.set_page_config(page_title="Dashboard Comércio Exterior", layout="wide")
 # Detecta tema
@@ -28,9 +30,8 @@ st.sidebar.markdown("""
     </h3>
 """, unsafe_allow_html=True)
 
-# Selectbox com label vazia
 aba = st.sidebar.selectbox(
-    "",  # Label vazia
+    "",
     [
         "Exportações por País",
         "Volume de Exportação por Produto",
@@ -47,7 +48,6 @@ aba = st.sidebar.selectbox(
 st.sidebar.image("logo.png", use_container_width=True)
 
 def grafico_barras(titulo, categorias, valores, x_title, y_title):
-    # Gera uma cor para cada categoria usando uma paleta do Plotly
     cores = px.colors.qualitative.Plotly
     cores_usadas = [cores[i % len(cores)] for i in range(len(categorias))]
 
@@ -74,9 +74,9 @@ def grafico_colunas(titulo, categorias, valores, x_title, y_title):
     fig = go.Figure(data=[go.Bar(
         x=categorias,
         y=valores,
-        marker=dict(color=px.colors.qualitative.Plotly),  # Cores diferenciadas
-        text=[f"{v:,.0f}" for v in valores],  # Adiciona rótulos formatados
-        textposition='auto'  # Posição automática dos rótulos
+        marker=dict(color=px.colors.qualitative.Plotly),
+        text=[f"{v:,.0f}" for v in valores],
+        textposition='auto'
     )])
 
     fig.update_layout(
@@ -87,12 +87,11 @@ def grafico_colunas(titulo, categorias, valores, x_title, y_title):
         margin=dict(l=40, r=40, t=80, b=60),
         height=500,
         font=dict(size=14),
-        yaxis_tickprefix="$",  # Adiciona um prefixo para valores monetários
-        yaxis_tickformat=",.0f"  # Formata com separadores de milhar
+        yaxis_tickprefix="$",
+        yaxis_tickformat=",.0f"
     )
 
     st.plotly_chart(fig, use_container_width=True)
-
 
 def grafico_linha(titulo, categorias, valores, x_title, y_title):
     fig = go.Figure(data=go.Scatter(x=categorias, y=valores, mode='lines+markers', line=dict(color='green')))
@@ -142,6 +141,8 @@ if aba == "Exportações por País":
     else:
         st.warning("Nenhum dado encontrado.")
 
+# Possibilidade, juntar importação e exportação em um gráfico de barras duplas
+
 # Volume de Exportação por Produto
 elif aba == "Volume de Exportação por Produto":
     dados = consultaBanco.obter_volume_exportacoes_por_produto()
@@ -172,7 +173,6 @@ elif aba == "Valor Total Exportado por Ano":
     else:
         st.warning("Nenhum dado encontrado.")
 
-
 # Total Importado por Ano
 elif aba == "Valor Total Importado por Ano":
     dados = consultaBanco.obter_total_importado_por_ano()
@@ -187,10 +187,52 @@ elif aba == "Valor Total Importado por Ano":
 # Comércio por Bloco Econômico
 elif aba == "Comércio por Bloco Econômico":
     dados = consultaBanco.obter_evolucao_comercio_por_bloco()
+    
     if dados:
-        blocos = [linha[0] for linha in dados]
-        valores = [linha[1] for linha in dados]
-        grafico_pizza("🧱 Participação dos Blocos Econômicos", blocos, valores)
+        tipos_map = {"Imporações": "IMPORT", "Exportações": "EXPORT"}
+
+        opcoes = list(tipos_map.keys())
+        tipo_escolhido = st.radio("Selecione o tipo de transação", opcoes)
+        
+        tipo_valor = tipos_map.get(tipo_escolhido)
+
+        st.success(f"Exibindo dados de {tipo_valor.lower()}ações.")
+
+        blocos_por_data = defaultdict(list)
+
+        for linha in dados:
+            bloco_origem = linha[0]
+            ano, mes, dia = linha[2], linha[3], linha[4]
+            tp_transacao = linha[5]
+            valor = linha[6]
+            
+            if tp_transacao == tipo_valor:
+                data = date(ano, mes, dia)
+                blocos_por_data[bloco_origem].append((data, valor))
+
+        fig = go.Figure()
+        for bloco, entradas in blocos_por_data.items():
+            entradas.sort() 
+            datas = [item[0] for item in entradas]
+            valores = [item[1] for item in entradas]
+
+            fig.add_trace(go.Scatter(
+                x=datas,
+                y=valores,
+                mode="lines+markers",
+                name=bloco
+            ))
+
+        fig.update_layout(
+            title=f"📈 Evolução do Comércio por Bloco Econômico - {tipo_valor.title()}ações",
+            xaxis_title="Data",
+            yaxis_title="Valor Monetário Total",
+            template="plotly_white",
+            height=500
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+    
     else:
         st.warning("Nenhum dado encontrado.")
 

@@ -9,7 +9,7 @@ db_params = {
     "options": "-c client_encoding=UTF8"
 }
 
-#Quais países mais exportam?
+# Quais países mais exportam?
 def obter_exportacoes_por_pais():
     try:
         conn = psycopg2.connect(**db_params)

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 db_params = {
-    "dbname": "star_comex_principal",
+    "dbname": "star_comex_data_mart",
     "user": "postgres",
     "password": "postgres", 
     "host": os.getenv("DB_HOST"),
@@ -13,18 +13,18 @@ db_params = {
     "options": "-c client_encoding=UTF8"
 }
 
-#Quais países mais exportam?
+# Quais países mais exportam?
 def obter_exportacoes_por_pais():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
         query = """
-            SELECT p.nome AS pais, COALESCE(SUM(t.valor_monetario), 0) AS total_exportado
-            FROM public.paises p
-            LEFT JOIN public.transacoes t ON t.pais_origem = p.id
-            LEFT JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id AND tt.descricao = 'EXPORT'
-            GROUP BY p.nome
+            SELECT dp.pais, COALESCE(SUM(ft.valor_monetario), 0) AS total_exportado
+            FROM ft_transacoes ft
+            INNER JOIN dm_pais dp on dp.sk_pais = ft.sk_pais_origem
+            WHERE ft.tp_transacao = 'EXPORT'
+            GROUP BY dp.pais
             ORDER BY total_exportado DESC;
         """
 
@@ -40,21 +40,20 @@ def obter_exportacoes_por_pais():
         print(f"Erro ao conectar ao banco: {e}")
         return []
 
-#Quais produtos têm maior volume de exportação?
+# Quais produtos têm maior volume de exportação?
 def obter_volume_exportacoes_por_produto():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
         query_exportacoes = """
-            SELECT 
-                p.descricao AS produto, 
-                SUM(t.quantidade) AS volume_exportado
-            FROM public.transacoes t
-            JOIN public.produtos p ON t.produto_id = p.id
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            WHERE tt.descricao = 'EXPORT'
-            GROUP BY p.descricao
+            SELECT
+                dp.descricao AS produto,
+                SUM(ft.quantidade) AS volume_exportado
+            FROM ft_transacoes ft
+            JOIN dm_produtos dp ON ft.sk_produto = dp.sk_produto
+            WHERE ft.tp_transacao = 'EXPORT'
+            GROUP BY 1
             ORDER BY volume_exportado DESC;
         """
 
@@ -70,22 +69,21 @@ def obter_volume_exportacoes_por_produto():
         print(f"Erro ao conectar ao banco: {e}")
         return []
 
-#Quais produtos têm maior volume de importação?
+# Quais produtos têm maior volume de importação?
 def obter_volume_importacoes_por_produto():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
         query_importacoes = """
-            SELECT 
-                p.descricao AS produto, 
-                SUM(t.quantidade) AS volume_importado
-            FROM public.transacoes t
-            JOIN public.produtos p ON t.produto_id = p.id
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            WHERE tt.descricao = 'IMPORT'
-            GROUP BY p.descricao
-            ORDER BY volume_importado DESC;
+            SELECT
+                dp.descricao AS produto,
+                SUM(ft.quantidade) AS volume_exportado
+            FROM ft_transacoes ft
+            JOIN dm_produtos dp ON ft.sk_produto = dp.sk_produto
+            WHERE ft.tp_transacao = 'IMPORT'
+            GROUP BY 1
+            ORDER BY volume_exportado DESC;
         """
 
         cursor.execute(query_importacoes)
@@ -100,28 +98,33 @@ def obter_volume_importacoes_por_produto():
         print(f"Erro ao conectar ao banco: {e}")
         return []
 
-#Qual a evolução do comércio por bloco econômico ao longo do tempo?
+# Qual a evolução do comércio por bloco econômico ao longo do tempo?
 def obter_evolucao_comercio_por_bloco():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
         query = """
-            SELECT
-                bloco_economico,
-                SUM(total_comercializado) AS total_por_bloco
-            FROM (
-                SELECT
-                    b.nome AS bloco_economico,
-                    SUM(t.valor_monetario) AS total_comercializado
-                FROM public.transacoes t
-                JOIN public.paises p ON t.pais_origem = p.id
-                JOIN public.blocos_economicos b ON p.bloco_id = b.id
-                JOIN public.cambios c ON t.cambio_id = c.id
-                GROUP BY b.nome
-            ) AS subconsulta
-            GROUP BY bloco_economico
-            ORDER BY total_por_bloco DESC;
+            SELECT 
+                dp1.nm_bloco AS bloco_origem,
+                dp2.nm_bloco AS bloco_destino,
+                dt.ano,
+                dt.mes,
+                dt.dia,
+                ft.tp_transacao,
+                SUM(ft.valor_monetario) AS total_valor_monetario
+            FROM 
+                ft_transacoes ft
+            INNER JOIN 
+                dm_pais dp1 ON dp1.sk_pais = ft.sk_pais_origem
+            INNER JOIN 
+                dm_pais dp2 ON dp2.sk_pais = ft.sk_pais_destino
+            INNER JOIN 
+                dm_tempo dt ON dt.sk_tempo = ft.sk_tempo
+            GROUP BY 
+                dp1.nm_bloco, dp2.nm_bloco, dt.ano, dt.mes, dt.dia, ft.tp_transacao
+            ORDER BY 
+                dt.ano, dt.mes, dt.dia, dp1.nm_bloco, dp2.nm_bloco;
         """
 
         cursor.execute(query)
@@ -136,7 +139,7 @@ def obter_evolucao_comercio_por_bloco():
         print(f"Erro ao conectar ao banco: {e}")
         return []
 
-#Quais os principais parceiros comerciais de cada país?    
+# Quais os principais parceiros comerciais de cada país?    
 def obter_parceiros_comerciais():
     try:
         conn = psycopg2.connect(**db_params)
@@ -224,7 +227,7 @@ def obter_variacao_cambio_exportacoes():
         print(f"Erro ao conectar ao banco: {e}")
         return []
     
-#Qual a variação das taxas de câmbio e seu impacto no comércio? importações
+# Qual a variação das taxas de câmbio e seu impacto no comércio? importações
 def obter_variacao_cambio_import():
     try:
         conn = psycopg2.connect(**db_params)
@@ -282,7 +285,7 @@ def obter_variacao_cambio_import():
         print(f"Erro ao conectar ao banco: {e}")
         return []
     
-#Qual a distribuição dos meios de transporte utilizados nas transações?
+# Qual a distribuição dos meios de transporte utilizados nas transações?
 def obter_percentual_transporte():
     try:
         conn = psycopg2.connect(**db_params)
@@ -311,7 +314,7 @@ def obter_percentual_transporte():
         print(f"Erro ao conectar ao banco: {e}")
         return []
 
-#Qual valor total exportado por ano?
+# Qual valor total exportado por ano?
 def obter_total_exportado_por_ano():
     try:
         conn = psycopg2.connect(**db_params)
@@ -341,7 +344,7 @@ def obter_total_exportado_por_ano():
         print(f"Erro ao conectar ao banco: {e}")
         return []
     
-#Qual valor total importado por ano?
+# Qual valor total importado por ano?
 def obter_total_importado_por_ano():
     try:
         conn = psycopg2.connect(**db_params)
