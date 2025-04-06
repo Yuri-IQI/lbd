@@ -221,14 +221,12 @@ elif aba == "Comércio por Bloco Econômico":
     dados = consultaBanco.obter_evolucao_comercio_por_bloco()
     
     if dados:
-        tipos_map = {"Imporações": "IMPORT", "Exportações": "EXPORT"}
+        tipos_map = {"Importações": "IMPORT", "Exportações": "EXPORT"}
 
         opcoes = list(tipos_map.keys())
         tipo_escolhido = st.radio("Selecione o tipo de transação", opcoes)
         
         tipo_valor = tipos_map.get(tipo_escolhido)
-
-        st.success(f"Exibindo dados de {tipo_valor.lower()}ações.")
 
         blocos_por_data = defaultdict(list)
 
@@ -274,30 +272,27 @@ elif aba == "Parceiros Comerciais":
     st.subheader("📊 Parceiros Comerciais")
 
     if dados:
-        parceiros_por_origem = {}
+        paises_origem = sorted(set([linha[0] for linha in dados]))
+        paises_map = {pais.title(): pais for pais in paises_origem}
 
-        for linha in dados:
-            origem = linha[0]
-            destino = linha[1]
-            valor = float(linha[2])
+        pais_opcoes = list(paises_map.keys())
+        pais_escolhido_title = st.radio("Selecione o país de origem:", pais_opcoes, horizontal=True)
+        pais_escolhido = paises_map[pais_escolhido_title]
 
-            if origem not in parceiros_por_origem:
-                parceiros_por_origem[origem] = []
-            parceiros_por_origem[origem].append((destino, f"{valor:,.2f}"))
+        tipos_map = {"Importações": "IMPORT", "Exportações": "EXPORT"}
 
-        for origem, destinos in parceiros_por_origem.items():
-            st.markdown(
-                f"<h4 style='margin-bottom:0.2em;'>📦 {origem} - Exportações para {len(destinos)} países</h4>",
-                unsafe_allow_html=True
-            )
+        tipos_opcoes = list(tipos_map.keys())
+        tipo_escolhido = st.radio("Selecione o tipo de transação", tipos_opcoes, horizontal=True)
+        
+        tipo_valor = tipos_map.get(tipo_escolhido)
 
-            with st.expander("Clique para ver detalhes", expanded=False):
-                for destino, valor in destinos:
-                    st.markdown(
-                        f"<p style='font-size:18px;'>➡️ <strong>{destino}</strong>: "
-                        f"<span style='color:#1f77b4;'>${valor}</span></p>",
-                        unsafe_allow_html=True
-                    )
+        parceiros = [linha[1] for linha in dados if linha[0] == pais_escolhido]
+        valores = [linha[2] for linha in dados if linha[0] == pais_escolhido and linha[3] == tipo_valor]
+
+        if parceiros and valores:
+            grafico_pizza(f"🌍 Distribuição de Parceiros Comerciais - {pais_escolhido_title}", parceiros, valores)
+        else:
+            st.warning("Nenhum dado de parceiros encontrado para este país.")
     else:
         st.warning("Nenhum dado encontrado.")
 

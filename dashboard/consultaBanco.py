@@ -149,11 +149,12 @@ def obter_parceiros_comerciais():
             SELECT
                 p1.pais AS pais,
                 p2.pais AS parceiro_comercial,
-                SUM(ft.valor_monetario) AS total_comercializado
+                SUM(ft.valor_monetario) AS total_comercializado,
+                ft.tp_transacao
             FROM ft_transacoes ft
             JOIN dm_pais p1 ON ft.sk_pais_origem = p1.sk_pais
             JOIN dm_pais p2 ON ft.sk_pais_destino = p2.sk_pais
-            GROUP BY p1.pais, p2.pais
+            GROUP BY p1.pais, p2.pais, ft.tp_transacao
             ORDER BY p1.pais, total_comercializado DESC;
         """
 
