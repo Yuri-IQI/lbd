@@ -177,101 +177,17 @@ def obter_variacao_cambio_exportacoes():
         cursor = conn.cursor()
 
         query = """
-            WITH Cambio_Anterior AS (
-                SELECT 
-                    c.id,
-                    c.data,
-                    c.moeda_origem,
-                    c.moeda_destino,
-                    c.taxa_cambio,
-                    LAG(c.taxa_cambio) OVER (
-                        PARTITION BY c.moeda_origem, c.moeda_destino ORDER BY c.data
-                    ) AS taxa_cambio_anterior
-                FROM public.cambios c
-            )
-            SELECT 
-                t.id AS transacao_id,
-                po.nome AS pais_origem,
-                pd.nome AS pais_destino,
-                p.descricao AS produto,
-                tt.descricao AS tipo_transacao,
-                mo_origem.descricao AS moeda_origem_nome,
-                mo_destino.descricao AS moeda_destino_nome,
-                c.data AS data_cambio,
-                c.taxa_cambio,
-                COALESCE(c.taxa_cambio_anterior, c.taxa_cambio) AS taxa_cambio_anterior,
-                (c.taxa_cambio - COALESCE(c.taxa_cambio_anterior, c.taxa_cambio)) AS diferenca_variacao,
-                t.valor_monetario AS valor_transacao,
-                t.quantidade,
-                (c.taxa_cambio - COALESCE(c.taxa_cambio_anterior, c.taxa_cambio)) * t.quantidade AS diferenca_valor
-            FROM public.transacoes t
-            JOIN Cambio_Anterior c ON t.cambio_id = c.id
-            JOIN public.paises po ON t.pais_origem = po.id
-            JOIN public.paises pd ON t.pais_destino = pd.id
-            JOIN public.produtos p ON t.produto_id = p.id
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            JOIN public.moedas mo_origem ON c.moeda_origem = mo_origem.id
-            JOIN public.moedas mo_destino ON c.moeda_destino = mo_destino.id
-            WHERE tt.descricao = 'EXPORT'
-            ORDER BY c.data ASC;
-        """
-
-        cursor.execute(query)
-        resultado = cursor.fetchall()
-
-        cursor.close()
-        conn.close()
-
-        return resultado
-
-    except Exception as e:
-        print(f"Erro ao conectar ao banco: {e}")
-        return []
-    
-# Qual a variação das taxas de câmbio e seu impacto no comércio? importações
-def obter_variacao_cambio_import():
-    try:
-        conn = psycopg2.connect(**db_params)
-        cursor = conn.cursor()
-
-        query = """
-            WITH Cambio_Anterior AS (
-                SELECT 
-                    c.id,
-                    c.data,
-                    c.moeda_origem,
-                    c.moeda_destino,
-                    c.taxa_cambio,
-                    LAG(c.taxa_cambio) OVER (
-                        PARTITION BY c.moeda_origem, c.moeda_destino ORDER BY c.data
-                    ) AS taxa_cambio_anterior
-                FROM public.cambios c
-            )
-            SELECT 
-                t.id AS transacao_id,
-                po.nome AS pais_origem,
-                pd.nome AS pais_destino,
-                p.descricao AS produto,
-                tt.descricao AS tipo_transacao,
-                mo_origem.descricao AS moeda_origem_nome,
-                mo_destino.descricao AS moeda_destino_nome,
-                c.data AS data_cambio,
-                c.taxa_cambio,
-                COALESCE(c.taxa_cambio_anterior, c.taxa_cambio) AS taxa_cambio_anterior,
-                (c.taxa_cambio - COALESCE(c.taxa_cambio_anterior, c.taxa_cambio)) AS diferenca_variacao,
-                t.valor_monetario AS valor_transacao,
-                t.quantidade,
-                (c.taxa_cambio - COALESCE(c.taxa_cambio_anterior, c.taxa_cambio)) * t.quantidade AS diferenca_valor
-            FROM public.transacoes t
-            JOIN Cambio_Anterior c ON t.cambio_id = c.id
-            JOIN public.paises po ON t.pais_origem = po.id
-            JOIN public.paises pd ON t.pais_destino = pd.id
-            JOIN public.produtos p ON t.produto_id = p.id
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            JOIN public.moedas mo_origem ON c.moeda_origem = mo_origem.id
-            JOIN public.moedas mo_destino ON c.moeda_destino = mo_destino.id
-            WHERE tt.descricao = 'IMPORT'
-            ORDER BY c.data ASC;
+            SELECT dc.cd_moeda_origem, dc.cd_moeda_destino, dc.taxa_cambio,
+                (SELECT SUM(ft2.valor_monetario)
+                        FROM ft_transacoes ft2
+                        INNER JOIN dm_tempo dt2 ON ft2.sk_tempo = dt2.sk_tempo
+                        WHERE ft.tp_transacao = ft2.tp_transacao AND dt2.data_completa = dt.data_completa) as total,
+                dt.ano, dt.mes, dt.dia, ft.tp_transacao
+            FROM ft_transacoes ft
+            INNER JOIN dm_cambios dc on dc.sk_cambio = ft.sk_cambio
+            INNER JOIN dm_tempo dt on dt.sk_tempo = ft.sk_tempo
+            GROUP BY dc.cd_moeda_origem, dc.cd_moeda_destino, dc.taxa_cambio, dt.ano, dt.mes, dt.dia, ft.tp_transacao, dt.data_completa
+            ORDER BY ano, mes, dia
         """
 
         cursor.execute(query)
@@ -293,13 +209,13 @@ def obter_percentual_transporte():
         cursor = conn.cursor()
 
         query = """
-            SELECT 
-                tr.descricao AS meio_transporte,
-                COUNT(t.id) AS total_transacoes,
-                ROUND((COUNT(t.id) * 100.0 / SUM(COUNT(t.id)) OVER ()), 2) AS percentual
-            FROM public.transacoes t
-            JOIN public.transportes tr ON t.transporte_id = tr.id
-            GROUP BY tr.descricao
+            SELECT
+                dt.ds_transporte AS meio_transporte,
+                COUNT(ft.sk_transporte) AS total_transacoes,
+                ROUND((COUNT(ft.sk_transporte) * 100.0 / SUM(COUNT(ft.sk_transporte)) OVER ()), 2) AS percentual
+            FROM ft_transacoes ft
+            JOIN dm_transporte dt ON ft.sk_transporte = dt.sk_transporte
+            GROUP BY dt.ds_transporte
             ORDER BY total_transacoes DESC;
         """
 

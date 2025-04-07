@@ -39,8 +39,7 @@ aba = st.sidebar.selectbox(
         "Valor Total Importado por Ano",
         "Comércio por Bloco Econômico",
         "Parceiros Comerciais",
-        "Variação Câmbio - Exportações",
-        "Variação Câmbio - Importações",
+        "Variação Câmbial",
         "Distribuição por Meio de Transporte"
     ],
     label_visibility="hidden"
@@ -298,123 +297,46 @@ elif aba == "Parceiros Comerciais":
         st.warning("Nenhum dado encontrado.")
 
 # Variação Câmbio - Exportações
-elif aba == "Variação Câmbio - Exportações":
+elif aba == "Variação Câmbial":
     dados = consultaBanco.obter_variacao_cambio_exportacoes()
     if dados:
-        moeda_dados = {}
-        for linha in dados:
-            moeda_origem = linha[5]
-            moeda_destino = linha[6]
-            data_raw = linha[7]
-            diferenca = float(linha[10])
 
-            if isinstance(data_raw, str):
-                data_formatada = data_raw
-            else:
-                data_formatada = data_raw.strftime("%d/%m/%Y")
+        tipos_map = {"Importações": "IMPORT", "Exportações": "EXPORT"}
 
-            par_moeda = f"{moeda_origem} - {moeda_destino}"
+        tipos_opcoes = list(tipos_map.keys())
+        tipo_escolhido = st.radio("Selecione o tipo de transação", tipos_opcoes, horizontal=True)
+        
+        tipo_valor = tipos_map.get(tipo_escolhido)
 
-            if par_moeda not in moeda_dados:
-                moeda_dados[par_moeda] = {"datas": [], "diferencas": []}
+        moedas_origem = [linha[0] for linha in dados]
+        moedas_destino = [linha[1] for linha in dados]
 
-            moeda_dados[par_moeda]["datas"].append(data_formatada)
-            moeda_dados[par_moeda]["diferencas"].append(diferenca)
-
-        fig = go.Figure()
-        for par, info in moeda_dados.items():
-            fig.add_trace(go.Scatter(
-                x=info["datas"],
-                y=info["diferencas"],
-                mode='lines+markers',
-                name=par,
-                line=dict(width=2),
-                marker=dict(size=6)
-            ))
-
-        fig.update_layout(
-            title=dict(
-                text="💱 Variação Cambial - Exportações por Par de Moedas",
-                font=dict(size=22)
-            ),
-            xaxis_title="Data",
-            yaxis_title="Diferença Cambial",
-            template="plotly_white",
-            height=550,
-            font=dict(size=14),
-            legend=dict(
-                title="Par de Moedas",
-                font=dict(size=16), 
-                title_font=dict(size=18) 
-            ),
-            xaxis_tickangle=-45,
-            margin=dict(l=20, r=20, t=80, b=60)
+        moeda_origem = st.selectbox(
+            "Selecione a moeda de origem:",
+            options=sorted(set(moedas_origem)),
+            key="moeda_origem"
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        moeda_destino = st.selectbox(
+            "Selecione a moeda de destino:",
+            options=sorted(set(moedas_destino)),
+            key="moeda_destino"
+        )
+
+        cambios = [linha[2] for linha in dados if linha[0] == moeda_origem and linha[1] == moeda_destino and linha[7] == tipo_valor]
+        datas = [[linha[4], linha[5], linha[6]] for linha in dados]
+
+        grafico_linha(
+            f"💱 Variação Cambial - {moeda_origem} para {moeda_destino}",
+            [f"{data[0]:02d}/{data[1]:02d}/{data[2]}" for data in datas],
+            cambios,
+            "Data",
+            "Variação Cambial"
+        )
     else:
         st.warning("Nenhum dado encontrado.")
 
-# Variação Câmbio - Importações
-elif aba == "Variação Câmbio - Importações":
-    dados = consultaBanco.obter_variacao_cambio_import()
-    if dados:
-        moeda_dados = {}
-        for linha in dados:
-            moeda_origem = linha[5]
-            moeda_destino = linha[6]
-            data_raw = linha[7]
-            diferenca = float(linha[10])
-
-            # Formatar a data como string legível
-            if isinstance(data_raw, str):
-                data_formatada = data_raw
-            else:
-                data_formatada = data_raw.strftime("%d/%m/%Y")
-
-            par_moeda = f"{moeda_origem} - {moeda_destino}"
-
-            if par_moeda not in moeda_dados:
-                moeda_dados[par_moeda] = {"datas": [], "diferencas": []}
-
-            moeda_dados[par_moeda]["datas"].append(data_formatada)
-            moeda_dados[par_moeda]["diferencas"].append(diferenca)
-
-        fig = go.Figure()
-        for par, info in moeda_dados.items():
-            fig.add_trace(go.Scatter(
-                x=info["datas"],
-                y=info["diferencas"],
-                mode='lines+markers',
-                name=par,
-                line=dict(width=2),
-                marker=dict(size=6)
-            ))
-
-        fig.update_layout(
-            title=dict(
-                text="💱 Variação Cambial - Importações por Par de Moedas",
-                font=dict(size=22)  # Tamanho do título
-            ),
-            xaxis_title="Data",
-            yaxis_title="Diferença Cambial",
-            template="plotly_white",
-            height=550,
-            font=dict(size=14),  # Tamanho geral de fonte
-            legend=dict(
-                title="Par de Moedas",
-                font=dict(size=16),  # Tamanho da legenda
-                title_font=dict(size=18)  # Tamanho do título da legenda
-            ),
-            xaxis_tickangle=-45,
-            margin=dict(l=20, r=20, t=80, b=60)
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("Nenhum dado encontrado.")
-
-## Distribuição por Meio de Transporte
+# Distribuição por Meio de Transporte
 elif aba == "Distribuição por Meio de Transporte":
     dados = consultaBanco.obter_percentual_transporte()
     if dados:
@@ -435,9 +357,9 @@ elif aba == "Distribuição por Meio de Transporte":
             title_font=dict(size=24),
             legend_title="Modal",
             legend=dict(
-                font=dict(size=18),  # Aumenta o tamanho da legenda
-                orientation="v",     # Vertical (padrão)
-                x=1,                 # Alinha à direita
+                font=dict(size=18),
+                orientation="v",
+                x=1,
                 y=0.5
             ),
             margin=dict(l=20, r=20, t=80, b=20)
