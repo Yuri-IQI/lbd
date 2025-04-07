@@ -270,9 +270,9 @@ CREATE TABLE DM_Cambios (
 	id_cambio int4 NOT NULL,
 	data date NOT NULL,
 	ds_moeda_origem varchar(255) NOT NULL,
-	pais_moeda_origem varchar(10) NOT NULL,
+	cd_moeda_origem varchar(10) NOT NULL,
 	ds_moeda_destino varchar(255) NOT NULL,
-	pais_moeda_destino varchar(10) NOT NULL,
+	cd_moeda_destino varchar(10) NOT NULL,
 	taxa_cambio numeric(10,4) NOT NULL,
 	PRIMARY KEY (sk_cambio)
 );
