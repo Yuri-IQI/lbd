@@ -171,7 +171,7 @@ def obter_parceiros_comerciais():
         return []
 
 # Qual a variação das taxas de câmbio e seu impacto no comércio? exprotações
-def obter_variacao_cambio_exportacoes():
+def obter_variacao_cambio():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()

@@ -1,3 +1,4 @@
+from decimal import Decimal
 import streamlit as st
 import consultaBanco
 import plotly.graph_objects as go
@@ -296,45 +297,52 @@ elif aba == "Parceiros Comerciais":
     else:
         st.warning("Nenhum dado encontrado.")
 
-# Variação Câmbio - Exportações
+# Variação Câmbial
 elif aba == "Variação Câmbial":
-    dados = consultaBanco.obter_variacao_cambio_exportacoes()
+    dados = consultaBanco.obter_variacao_cambio()
+
     if dados:
+        moedas_origem = sorted({linha[0] for linha in dados})
+        moedas_destino = sorted({linha[1] for linha in dados})
 
-        tipos_map = {"Importações": "IMPORT", "Exportações": "EXPORT"}
+        moeda_origem = st.selectbox("Selecione a moeda de origem:", options=moedas_origem, key="moeda_origem")
+        moeda_destino = st.selectbox("Selecione a moeda de destino:", options=moedas_destino, key="moeda_destino")
 
-        tipos_opcoes = list(tipos_map.keys())
-        tipo_escolhido = st.radio("Selecione o tipo de transação", tipos_opcoes, horizontal=True)
-        
-        tipo_valor = tipos_map.get(tipo_escolhido)
+        resultados = [
+            (linha[2], linha[3], linha[4], linha[5], linha[6], linha[7].capitalize() + 'ação')
+            for linha in dados
+            if linha[0] == moeda_origem and linha[1] == moeda_destino
+        ]
 
-        moedas_origem = [linha[0] for linha in dados]
-        moedas_destino = [linha[1] for linha in dados]
+        if resultados:
+            cambios = [item[0] for item in resultados]
+            valores_monetarios = [int(item[1]) for item in resultados]
+            datas = [datetime(ano, mes, dia) for _, _, ano, mes, dia, _ in resultados]
+            tipos = [item[5] for item in resultados]
+            fig = px.scatter(
+                x=datas,
+                y=cambios,
+                color=tipos,
+                size=valores_monetarios,
+                size_max=60,
+                title=f"📈 Variação Cambial - {moeda_origem} para {moeda_destino}",
+                labels={"x": "Data", "y": "Câmbio"},
+                template=template_plotly
+            )
 
-        moeda_origem = st.selectbox(
-            "Selecione a moeda de origem:",
-            options=sorted(set(moedas_origem)),
-            key="moeda_origem"
-        )
+            fig.update_layout(
+                yaxis=dict(range=[min(0, min(cambios)), max(cambios) * Decimal('1.1')])
+            )
 
-        moeda_destino = st.selectbox(
-            "Selecione a moeda de destino:",
-            options=sorted(set(moedas_destino)),
-            key="moeda_destino"
-        )
+            fig.update_traces(
+                hovertemplate='Data: %{x}<br>Câmbio: %{y}<br>Valor: %{marker.size}'
+            )
 
-        cambios = [linha[2] for linha in dados if linha[0] == moeda_origem and linha[1] == moeda_destino and linha[7] == tipo_valor]
-        datas = [[linha[4], linha[5], linha[6]] for linha in dados]
-
-        grafico_linha(
-            f"💱 Variação Cambial - {moeda_origem} para {moeda_destino}",
-            [f"{data[0]:02d}/{data[1]:02d}/{data[2]}" for data in datas],
-            cambios,
-            "Data",
-            "Variação Cambial"
-        )
+            st.plotly_chart(fig)
+        else:
+            st.info("Nenhum dado encontrado para os filtros selecionados.")
     else:
-        st.warning("Nenhum dado encontrado.")
+        st.warning("Nenhum dado disponível no banco.")
 
 # Distribuição por Meio de Transporte
 elif aba == "Distribuição por Meio de Transporte":
