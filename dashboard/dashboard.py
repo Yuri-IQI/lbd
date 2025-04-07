@@ -31,7 +31,7 @@ st.sidebar.markdown("""
 """, unsafe_allow_html=True)
 
 aba = st.sidebar.selectbox(
-    "",
+    "If I must",
     [
         "Exportações por País",
         "Volume de Importação/Exportação por Produto",
@@ -42,7 +42,8 @@ aba = st.sidebar.selectbox(
         "Variação Câmbio - Exportações",
         "Variação Câmbio - Importações",
         "Distribuição por Meio de Transporte"
-    ]
+    ],
+    label_visibility="hidden"
 )
 st.sidebar.image("logo.png", use_container_width=True)
 

@@ -3,7 +3,7 @@ from pyspark.sql.functions import (
     upper, col, udf, row_number,
     year, month, dayofmonth
 )
-from pyspark.sql.types import StringType, FloatType
+from pyspark.sql.types import StringType, FloatType, StructField, StructType
 from pyspark.sql.window import Window
 from dotenv import load_dotenv
 import requests
@@ -111,48 +111,67 @@ def etl_countries():
 
 # ETL de Câmbio
 @udf(StringType())
-def fetch_exchange_rate(date, from_country_code, to_country_code):
-    if from_country_code == 'EUR':
-        origin = 'EUR'
-        destination = get_currency_from_country_code(to_country_code)
-
-    elif to_country_code == 'EUR':
-        origin = get_currency_from_country_code(from_country_code)
-        destination = 'EUR'
-    else:
-        origin = get_currency_from_country_code(from_country_code)
-        destination = get_currency_from_country_code(to_country_code)
-
-    try:
-        if not origin or not destination:
+def fetch_exchange_rate(date, from_code, to_code):
+    def try_fetch(from_currency, to_currency):
+        if not from_currency or not to_currency:
+            return None
+        try:
+            res = requests.get(f"https://api.frankfurter.dev/v1/{date}?from={from_currency}&to={to_currency}")
+            res.raise_for_status()
+            rate = res.json().get("rates", {}).get(to_currency)
+            return str(rate) if rate else None
+        except:
             return None
 
-        res = requests.get(f"https://api.frankfurter.dev/v1/{date}?from={origin}&to={destination}")
-        res.raise_for_status()
-        rate = res.json().get("rates", {}).get(destination)
-        return str(rate) if rate else None
-    except Exception as e:
-        return None
+    rate = try_fetch(from_code, to_code)
+    if rate:
+        return [rate, from_code, to_code]
+
+    from_currency = get_currency_from_country_code(from_code)
+    rate = try_fetch(from_currency, to_code)
+    if rate:
+        return [rate, from_currency, to_code]
+
+    to_currency = get_currency_from_country_code(to_code)
+    rate = try_fetch(from_code, to_currency)
+    if rate:
+        return [rate, from_code, to_currency]
+
+    return [try_fetch(from_currency, to_currency), from_currency, to_currency]
+
+exchange_struct = StructType([
+    StructField("taxa_cambio", FloatType(), True),
+    StructField("cd_moeda_origem", StringType(), True),
+    StructField("cd_moeda_destino", StringType(), True),
+])
 
 def etl_exchange_rates():
     query = """
         SELECT c.id AS id_cambio, c.data,
-               m1.descricao AS ds_moeda_origem, m1.pais AS pais_moeda_origem,
-               m2.descricao AS ds_moeda_destino, m2.pais AS pais_moeda_destino,
+               m1.descricao AS ds_moeda_origem, m1.pais AS cd_moeda_origem,
+               m2.descricao AS ds_moeda_destino, m2.pais AS cd_moeda_destino,
                c.taxa_cambio
         FROM cambios c
         INNER JOIN moedas m1 ON m1.id = c.moeda_origem
         INNER JOIN moedas m2 ON m2.id = c.moeda_destino
     """
     df = extract_from_principal(query)
-    df = transform_text_to_uppercase(df, ["ds_moeda_origem", "pais_moeda_origem", "ds_moeda_destino", "pais_moeda_destino"])
-    df = df.withColumn("taxa_cambio", fetch_exchange_rate(col("data"), col("pais_moeda_origem"), col("pais_moeda_destino")).cast(FloatType()))
+    df = transform_text_to_uppercase(df, ["ds_moeda_origem", "cd_moeda_origem", "ds_moeda_destino", "cd_moeda_destino"])
+
+    df = df.withColumn("exchange_struct", fetch_exchange_rate(col("data"), col("cd_moeda_origem"), col("cd_moeda_destino")).cast(exchange_struct))
+
+    df = df.withColumn("taxa_cambio", col("exchange_struct.taxa_cambio").cast(FloatType)) \
+            .withColumn("cd_moeda_origem", col("exchange_struct.cd_moeda_origem")) \
+            .withColumn("cd_moeda_destino", col("exchange_struct.cd_moeda_destino")) \
+            .drop("exchange_struct")
+
+
     df = add_surrogate_key(df, "id_cambio", "sk_cambio")
 
     df = df.select(
         "sk_cambio", "id_cambio", "data",
-        "ds_moeda_origem", "pais_moeda_origem",
-        "ds_moeda_destino", "pais_moeda_destino", "taxa_cambio"
+        "ds_moeda_origem", "cd_moeda_origem",
+        "ds_moeda_destino", "cd_moeda_destino", "taxa_cambio"
     )
     load_to_data_mart(df, "dm_cambios")
     return df
