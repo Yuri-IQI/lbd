@@ -265,11 +265,7 @@ CREATE TABLE DM_Pais (
 	PRIMARY KEY (sk_pais)
 );
 
-CREATE TABLE DM_Cambios (create table transacao_transporte (
-    id_transacao int4 primary key,
-    ds_transporte varchar(50)
-);
-
+CREATE TABLE DM_Cambios (
 	sk_cambio int4 NOT NULL,
 	id_cambio int4 NOT NULL,
 	data date NOT NULL,
