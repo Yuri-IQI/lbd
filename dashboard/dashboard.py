@@ -7,7 +7,6 @@ from collections import defaultdict
 from datetime import date, datetime
 
 st.set_page_config(page_title="Dashboard Comércio Exterior", layout="wide")
-# Detecta tema
 tema_atual = st.get_option("theme.base")
 modo_escuro = tema_atual == "dark"
 template_plotly = "plotly_dark" if modo_escuro else "plotly_white"

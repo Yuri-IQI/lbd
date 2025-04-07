@@ -21,3 +21,15 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       - postgres
+
+  dashboard:
+    container_name: dashboard
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: ${DB_HOST}
