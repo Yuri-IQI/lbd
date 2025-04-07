@@ -21,11 +21,10 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 db_properties = {
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
+    "user": "postgres",
+    "password": "postgres",
     "driver": "org.postgresql.Driver"
 }
-
 
 def extract_from_principal(query: str):
     return spark.read \
@@ -110,7 +109,13 @@ def etl_countries():
     return df
 
 # ETL de Câmbio
-@udf(StringType())
+exchange_struct = StructType([
+    StructField("taxa_cambio", FloatType(), True),
+    StructField("cd_moeda_origem", StringType(), True),
+    StructField("cd_moeda_destino", StringType(), True),
+])
+
+@udf(exchange_struct)
 def fetch_exchange_rate(date, from_code, to_code):
     def try_fetch(from_currency, to_currency):
         if not from_currency or not to_currency:
@@ -119,31 +124,26 @@ def fetch_exchange_rate(date, from_code, to_code):
             res = requests.get(f"https://api.frankfurter.dev/v1/{date}?from={from_currency}&to={to_currency}")
             res.raise_for_status()
             rate = res.json().get("rates", {}).get(to_currency)
-            return str(rate) if rate else None
+            return float(rate) if rate else None
         except:
             return None
 
     rate = try_fetch(from_code, to_code)
     if rate:
-        return [rate, from_code, to_code]
+        return (rate, from_code, to_code)
 
     from_currency = get_currency_from_country_code(from_code)
     rate = try_fetch(from_currency, to_code)
     if rate:
-        return [rate, from_currency, to_code]
+        return (rate, from_currency, to_code)
 
     to_currency = get_currency_from_country_code(to_code)
     rate = try_fetch(from_code, to_currency)
     if rate:
-        return [rate, from_code, to_currency]
+        return (rate, from_code, to_currency)
 
-    return [try_fetch(from_currency, to_currency), from_currency, to_currency]
-
-exchange_struct = StructType([
-    StructField("taxa_cambio", FloatType(), True),
-    StructField("cd_moeda_origem", StringType(), True),
-    StructField("cd_moeda_destino", StringType(), True),
-])
+    rate = try_fetch(from_currency, to_currency)
+    return (rate, from_currency, to_currency) if rate else (None, from_currency, to_currency)
 
 def etl_exchange_rates():
     query = """
@@ -155,25 +155,37 @@ def etl_exchange_rates():
         INNER JOIN moedas m1 ON m1.id = c.moeda_origem
         INNER JOIN moedas m2 ON m2.id = c.moeda_destino
     """
+
     df = extract_from_principal(query)
-    df = transform_text_to_uppercase(df, ["ds_moeda_origem", "cd_moeda_origem", "ds_moeda_destino", "cd_moeda_destino"])
 
-    df = df.withColumn("exchange_struct", fetch_exchange_rate(col("data"), col("cd_moeda_origem"), col("cd_moeda_destino")).cast(exchange_struct))
+    df = transform_text_to_uppercase(df, [
+        "ds_moeda_origem", "cd_moeda_origem",
+        "ds_moeda_destino", "cd_moeda_destino"
+    ])
 
-    df = df.withColumn("taxa_cambio", col("exchange_struct.taxa_cambio").cast(FloatType)) \
-            .withColumn("cd_moeda_origem", col("exchange_struct.cd_moeda_origem")) \
-            .withColumn("cd_moeda_destino", col("exchange_struct.cd_moeda_destino")) \
-            .drop("exchange_struct")
+    df = df.withColumn(
+        "exchange_struct",
+        fetch_exchange_rate(
+            col("data"), col("cd_moeda_origem"), col("cd_moeda_destino")
+        )
+    )
 
+    df = df.withColumn("taxa_cambio", col("exchange_struct.taxa_cambio")) \
+           .withColumn("cd_moeda_origem", col("exchange_struct.cd_moeda_origem")) \
+           .withColumn("cd_moeda_destino", col("exchange_struct.cd_moeda_destino")) \
+           .drop("exchange_struct")
 
     df = add_surrogate_key(df, "id_cambio", "sk_cambio")
 
     df = df.select(
         "sk_cambio", "id_cambio", "data",
         "ds_moeda_origem", "cd_moeda_origem",
-        "ds_moeda_destino", "cd_moeda_destino", "taxa_cambio"
+        "ds_moeda_destino", "cd_moeda_destino",
+        "taxa_cambio"
     )
+
     load_to_data_mart(df, "dm_cambios")
+
     return df
 
 # ETL de Tempo
@@ -183,7 +195,7 @@ def etl_time_from_exchange(exchange_df):
     dates_df = dates_df.withColumn("ano", year(col("data"))) \
                        .withColumn("mes", month(col("data"))) \
                        .withColumn("dia", dayofmonth(col("data")))
-    
+
     dates_df = dates_df.withColumn("sk_tempo", row_number().over(Window.orderBy("data")))
 
     dm_time = dates_df.select("sk_tempo", col("data").alias("data_completa"), "ano", "mes", "dia")
@@ -193,7 +205,7 @@ def etl_time_from_exchange(exchange_df):
 
 # ETL da Tabela Fatos
 def etl_facts():
-    query = """ 
+    query = """
         SELECT
             t.id AS id_transacao,
             t.quantidade,

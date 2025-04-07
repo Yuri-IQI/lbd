@@ -8,7 +8,7 @@ db_params = {
     "dbname": "star_comex_data_mart",
     "user": "postgres",
     "password": "postgres", 
-    "host": os.getenv("DB_HOST"),
+    "host": "localhost",
     "port": "5445",
     "options": "-c client_encoding=UTF8"
 }

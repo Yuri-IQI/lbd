@@ -32,4 +32,4 @@ services:
     depends_on:
       - postgres
     environment:
-      DB_HOST: ${DB_HOST}
+      DB_HOST: postgres
