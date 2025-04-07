@@ -36,8 +36,7 @@ aba = st.sidebar.selectbox(
     [
         "Exportações por País",
         "Volume de Importação/Exportação por Produto",
-        "Valor Total Exportado por Ano",
-        "Valor Total Importado por Ano",
+        "Valor Total Importado/Exportado por Ano",
         "Comércio por Bloco Econômico",
         "Parceiros Comerciais",
         "Variação Câmbial",
@@ -93,12 +92,47 @@ def grafico_colunas(titulo, categorias, valores, x_title, y_title):
 
     st.plotly_chart(fig, use_container_width=True)
 
-def grafico_linha(titulo, categorias, valores, x_title, y_title):
-    fig = go.Figure(data=go.Scatter(x=categorias, y=valores, mode='lines+markers', line=dict(color='green')))
+def grafico_linha_flexivel(titulo, x_title, y_title, series, legend_labels=None):
+    fig = go.Figure()
+    all_y_vals = []
+
+    if isinstance(series, dict):
+        for label, entradas in series.items():
+            entradas.sort()
+            x_vals = [item[0] for item in entradas]
+            y_vals = [item[1] for item in entradas]
+            all_y_vals.extend(y_vals)
+            fig.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode="lines+markers",
+                name=label
+            ))
+    else:
+        x_vals, y_vals = series
+        all_y_vals.extend(y_vals)
+        fig.add_trace(go.Scatter(
+            x=x_vals,
+            y=y_vals,
+            mode="lines+markers",
+            name=legend_labels[0] if legend_labels else "",
+            line=dict(color='green')
+        ))
+
+    if all_y_vals:
+        max_val = max(all_y_vals)
+        if isinstance(max_val, Decimal):
+            y_max = max_val * Decimal('1.1')
+        else:
+            y_max = max_val * 1.1
+    else:
+        y_max = 1
+
     fig.update_layout(
         title=titulo,
         xaxis_title=x_title,
         yaxis_title=y_title,
+        yaxis=dict(range=[0, y_max]),
         template="plotly_white",
         margin=dict(l=40, r=40, t=80, b=40),
         height=500
@@ -196,26 +230,26 @@ elif aba == "Volume de Importação/Exportação por Produto":
     else:
         st.warning("Nenhum dado encontrado.")
 
-# Valor Total Exportado por Ano
-elif aba == "Valor Total Exportado por Ano":
-    dados = consultaBanco.obter_total_exportado_por_ano()
+# Valor Total por Ano
+elif aba == "Valor Total Importado/Exportado por Ano":
+    dados = consultaBanco.obter_total_por_ano()
+    
     if dados:
-        anos = [int(linha[0]) for linha in dados]
-        totais = [linha[1] for linha in dados]
-        grafico_colunas("📊 Valor Total Exportado por Ano", anos, totais, "Ano", "Valor Total Exportado")
+        tipos_por_ano = defaultdict(list)
+        for linha in dados:
+            ano = int(linha[0])
+            valor = linha[1]
+            tipo = linha[2].capitalize() + 'ação'
+            tipos_por_ano[tipo].append((ano, valor))
+
+        grafico_linha_flexivel(
+            titulo="📊 Valor Total Comercializado por Ano",
+            x_title="Ano",
+            y_title="Valor Monetário Total",
+            series=tipos_por_ano
+        )
     else:
         st.warning("Nenhum dado encontrado.")
-
-# Total Importado por Ano
-elif aba == "Valor Total Importado por Ano":
-    dados = consultaBanco.obter_total_importado_por_ano()
-    if dados:
-        anos = [int(linha[0]) for linha in dados]
-        totais = [linha[1] for linha in dados]
-        grafico_colunas("📉 Total Importado por Ano", anos, totais, "Ano", "Total Importado")
-    else:
-        st.warning("Nenhum dado encontrado.")
-
 
 # Comércio por Bloco Econômico
 elif aba == "Comércio por Bloco Econômico":
@@ -223,10 +257,8 @@ elif aba == "Comércio por Bloco Econômico":
     
     if dados:
         tipos_map = {"Importações": "IMPORT", "Exportações": "EXPORT"}
-
         opcoes = list(tipos_map.keys())
         tipo_escolhido = st.radio("Selecione o tipo de transação", opcoes)
-        
         tipo_valor = tipos_map.get(tipo_escolhido)
 
         blocos_por_data = defaultdict(list)
@@ -241,28 +273,12 @@ elif aba == "Comércio por Bloco Econômico":
                 data = date(ano, mes, dia)
                 blocos_por_data[bloco_origem].append((data, valor))
 
-        fig = go.Figure()
-        for bloco, entradas in blocos_por_data.items():
-            entradas.sort() 
-            datas = [item[0] for item in entradas]
-            valores = [item[1] for item in entradas]
-
-            fig.add_trace(go.Scatter(
-                x=datas,
-                y=valores,
-                mode="lines+markers",
-                name=bloco
-            ))
-
-        fig.update_layout(
-            title=f"📈 Evolução do Comércio por Bloco Econômico - {tipo_valor.title()}ações",
-            xaxis_title="Data",
-            yaxis_title="Valor Monetário Total",
-            template="plotly_white",
-            height=500
+        grafico_linha_flexivel(
+            titulo=f"📈 Evolução do Comércio por Bloco Econômico - {tipo_valor.title()}ações",
+            x_title="Data",
+            y_title="Valor Monetário Total",
+            series=blocos_por_data
         )
-
-        st.plotly_chart(fig, use_container_width=True)
     
     else:
         st.warning("Nenhum dado encontrado.")

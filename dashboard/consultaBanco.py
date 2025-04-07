@@ -108,23 +108,14 @@ def obter_evolucao_comercio_por_bloco():
             SELECT 
                 dp1.nm_bloco AS bloco_origem,
                 dp2.nm_bloco AS bloco_destino,
-                dt.ano,
-                dt.mes,
-                dt.dia,
-                ft.tp_transacao,
-                SUM(ft.valor_monetario) AS total_valor_monetario
-            FROM 
-                ft_transacoes ft
-            INNER JOIN 
-                dm_pais dp1 ON dp1.sk_pais = ft.sk_pais_origem
-            INNER JOIN 
-                dm_pais dp2 ON dp2.sk_pais = ft.sk_pais_destino
-            INNER JOIN 
-                dm_tempo dt ON dt.sk_tempo = ft.sk_tempo
-            GROUP BY 
-                dp1.nm_bloco, dp2.nm_bloco, dt.ano, dt.mes, dt.dia, ft.tp_transacao
-            ORDER BY 
-                dt.ano, dt.mes, dt.dia, dp1.nm_bloco, dp2.nm_bloco;
+                dt.ano, dt.mes, dt.dia,
+                ft.tp_transacao, SUM(ft.valor_monetario) AS total_valor_monetario
+            FROM ft_transacoes ft
+            INNER JOIN dm_pais dp1 ON dp1.sk_pais = ft.sk_pais_origem
+            INNER JOIN dm_pais dp2 ON dp2.sk_pais = ft.sk_pais_destino
+            INNER JOIN dm_tempo dt ON dt.sk_tempo = ft.sk_tempo
+            GROUP BY dp1.nm_bloco, dp2.nm_bloco, dt.ano, dt.mes, dt.dia, ft.tp_transacao
+            ORDER BY dt.ano, dt.mes, dt.dia, dp1.nm_bloco, dp2.nm_bloco;
         """
 
         cursor.execute(query)
@@ -232,51 +223,19 @@ def obter_percentual_transporte():
         return []
 
 # Qual valor total exportado por ano?
-def obter_total_exportado_por_ano():
+def obter_total_por_ano():
     try:
         conn = psycopg2.connect(**db_params)
         cursor = conn.cursor()
 
         query = """
-            SELECT 
-                EXTRACT(YEAR FROM c.data) AS ano,
-                SUM(t.valor_monetario) AS total_exportado
-            FROM public.transacoes t
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            JOIN public.cambios c ON t.cambio_id = c.id
-            WHERE tt.descricao = 'EXPORT'
-            GROUP BY ano
-            ORDER BY ano DESC;
-        """
-
-        cursor.execute(query)
-        resultado = cursor.fetchall()
-
-        cursor.close()
-        conn.close()
-
-        return resultado
-
-    except Exception as e:
-        print(f"Erro ao conectar ao banco: {e}")
-        return []
-    
-# Qual valor total importado por ano?
-def obter_total_importado_por_ano():
-    try:
-        conn = psycopg2.connect(**db_params)
-        cursor = conn.cursor()
-
-        query = """
-            SELECT 
-                EXTRACT(YEAR FROM c.data) AS ano,
-                SUM(t.valor_monetario) AS total_importado
-            FROM public.transacoes t
-            JOIN public.tipos_transacoes tt ON t.tipo_id = tt.id
-            JOIN public.cambios c ON t.cambio_id = c.id
-            WHERE tt.descricao = 'IMPORT'
-            GROUP BY ano
-            ORDER BY ano DESC;
+            SELECT
+                dt.ano,
+                SUM(ft.valor_monetario) AS valor_total, ft.tp_transacao
+            FROM ft_transacoes ft
+            INNER JOIN dm_tempo dt on dt.sk_tempo = ft.sk_tempo
+            GROUP BY dt.ano, ft.tp_transacao
+            ORDER BY 1;
         """
 
         cursor.execute(query)
