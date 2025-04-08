@@ -27,9 +27,8 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    ports:
-      - "8501:8501"
     depends_on:
       - postgres
+    network_mode: "host"
     environment:
-      DB_HOST: postgres
+      DB_HOST: ${DB_HOST}
