@@ -329,31 +329,49 @@ elif aba == "Variação Câmbial":
             if linha[0] == moeda_origem and linha[1] == moeda_destino
         ]
 
-        if resultados:
-            cambios = [item[0] for item in resultados]
-            valores_monetarios = [int(item[1]) for item in resultados]
-            datas = [datetime(ano, mes, dia) for _, _, ano, mes, dia, _ in resultados]
-            tipos = [item[5] for item in resultados]
-            fig = px.scatter(
-                x=datas,
-                y=cambios,
-                color=tipos,
-                size=valores_monetarios,
-                size_max=60,
-                title=f"📈 Variação Cambial - {moeda_origem} para {moeda_destino}",
-                labels={"x": "Data", "y": "Câmbio"},
-                template=template_plotly
-            )
+        if resultados:            
+            datas_importacao = []
+            cambios_importacao = []
+            datas_exportacao = []
+            cambios_exportacao = []
+
+            for cambio, valor, ano, mes, dia, tipo in resultados:
+                data = datetime(ano, mes, dia)
+                if tipo == "Importação":
+                    datas_importacao.append(data)
+                    cambios_importacao.append(cambio)
+                elif tipo == "Exportação":
+                    datas_exportacao.append(data)
+                    cambios_exportacao.append(cambio)
+            
+            fig = go.Figure()
+
+            if datas_importacao:
+                fig.add_trace(go.Scatter(
+                    x=datas_importacao,
+                    y=cambios_importacao,
+                    mode='lines+markers',
+                    name='Importação'
+                ))
+
+            if datas_exportacao:
+                fig.add_trace(go.Scatter(
+                    x=datas_exportacao,
+                    y=cambios_exportacao,
+                    mode='lines+markers',
+                    name='Exportação'
+                ))
 
             fig.update_layout(
-                yaxis=dict(range=[min(0, min(cambios)), max(cambios) * Decimal('1.1')])
-            )
-
-            fig.update_traces(
-                hovertemplate='Data: %{x}<br>Câmbio: %{y}<br>Valor: %{marker.size}'
+                title=f"📈 Variação Cambial - {moeda_origem} para {moeda_destino}",
+                xaxis_title="Data",
+                yaxis_title="Câmbio",
+                template=template_plotly,
+                yaxis=dict(range=[min(0, min(cambios_importacao + cambios_exportacao)), max(cambios_importacao + cambios_exportacao) * Decimal('1.1')])
             )
 
             st.plotly_chart(fig)
+
         else:
             st.info("Nenhum dado encontrado para os filtros selecionados.")
     else:
